@@ -299,7 +299,8 @@ class APCAccess {
       return 0;
     }
 
-    this.log.update.info('Temperature:', temperature);
+    // Already visible in HomeKit; only logged in debug mode to keep the log quiet
+    this.log.debug('Temperature:', temperature);
     return temperature;
   }
 
@@ -420,7 +421,8 @@ class APCAccess {
       return MIN_LIGHT_LEVEL;
     }
 
-    this.log.update.info('Load:', `${load}%`);
+    // Changes constantly with what's plugged in; only logged in debug mode to keep the log quiet
+    this.log.debug('Load:', `${load}%`);
     // CurrentAmbientLightLevel can't go below 0.0001
     return Math.max(load, MIN_LIGHT_LEVEL);
   }

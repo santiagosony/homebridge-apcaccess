@@ -356,3 +356,24 @@ test('a voltage log threshold of 0 logs every change', async (t) => {
   );
   assert.deepEqual(lines, ['222 V', '220 V', '222 V']);
 });
+
+test('load and temperature readings only go to the debug log', async (t) => {
+  const lines = [];
+  const log = silentLog();
+  ['info', 'warn', 'error', 'debug'].forEach((level) => {
+    log[level] = (...args) => lines.push([level, args[0]]);
+  });
+
+  const { accessory } = await createAccessory(t, {
+    log,
+    loadSensor: true,
+    temperatureSensor: true,
+  });
+  await waitForFirstPoll(accessory);
+  accessory.latestJSON = { ...accessory.latestJSON, LOADPCT: '24.0 Percent', ITEMP: '30.0 C' };
+  accessory.doPolledChecks();
+
+  const levels = (message) => [...new Set(lines.filter(([, m]) => m === message).map(([l]) => l))];
+  assert.deepEqual(levels('Load:'), ['debug']);
+  assert.deepEqual(levels('Temperature:'), ['debug']);
+});

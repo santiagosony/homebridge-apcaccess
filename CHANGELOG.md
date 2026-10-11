@@ -9,6 +9,7 @@
 - Add `config.schema.json` for the Homebridge UI: host and port side by side (port is a plain number field), temperature sensor explained (ITEMP is only reported by Smart-UPS models), polling/logging and accessory information grouped in collapsed sections. Empty fields fall back to the defaults.
 - Services are now named after what they show: `<name> Charge` (battery), `<name> Power` (mains power sensor) and `<name> Temperature`, e.g. "UPS Charge".
 - New `contactSensor` option (default `true`) to hide the mains power contact sensor, and `powerSensorType` (`contact`, `leak` or `smoke`) to publish it as a leak or smoke sensor so power cuts arrive as HomeKit critical alerts.
+- Load and temperature readings are only logged in debug mode (`-D`), since they change often and are already visible in HomeKit.
 - Line voltage is only logged with the new `logVoltage` option, and only when it changed at least `voltageLogThreshold` % (default 5) since the last logged value.
 - New optional `voltageSensor`: exposes the input line voltage (`LINEV`) as a light sensor (lux = volts).
 - New optional `loadSensor`: exposes the UPS load (`LOADPCT`) as a light sensor (lux = %), the same type as the voltage sensor.
