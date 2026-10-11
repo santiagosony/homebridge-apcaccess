@@ -169,6 +169,9 @@ class APCAccess {
   async poll() {
     try {
       await this.getLatestJSON();
+    } catch (err) {
+      // Never let an unexpected error become an unhandled rejection, which stops Homebridge
+      this.log.error('Unexpected error while polling the UPS:', err);
     } finally {
       // Schedule the next poll only after this one finished, so requests never pile up
       this.pollTimer = setTimeout(
