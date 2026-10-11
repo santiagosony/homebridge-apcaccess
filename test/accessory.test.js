@@ -270,3 +270,23 @@ test('COMMLOST is "No Response", not a power cut', async (t) => {
   assert.throws(leak.getHandler, HapStatusError);
   assert.notEqual(leak.value, Characteristic.LeakDetected.LEAK_DETECTED);
 });
+
+test('"replace battery" is reported as low battery, not as "not chargeable"', async (t) => {
+  // Online, battery full, UPS_replacebatt set
+  const status = STATUS.map((line) => {
+    if (line.startsWith('STATFLAG')) return 'STATFLAG : 0x05000088';
+    if (line.startsWith('BCHARGE')) return 'BCHARGE  : 100.0 Percent';
+    return line;
+  });
+  const { accessory, hap } = await createAccessory(t, { status });
+  const { Characteristic } = hap;
+  await waitForFirstPoll(accessory);
+
+  const value = (characteristic) =>
+    accessory.batteryService.getCharacteristic(characteristic).value;
+  assert.equal(
+    value(Characteristic.StatusLowBattery),
+    Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW,
+  );
+  assert.equal(value(Characteristic.ChargingState), Characteristic.ChargingState.NOT_CHARGING);
+});

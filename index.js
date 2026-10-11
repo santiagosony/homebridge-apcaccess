@@ -52,7 +52,7 @@ const POWER_SENSORS = {
 // STATFLAG bits, as defined in apcupsd's include/defines.h
 const UPS_ONBATT = 0x10;
 const UPS_BATT_LOW = 0x40;
-const UPS_NOT_CHARGEABLE = 0x80;
+const UPS_REPLACE_BATT = 0x80;
 const UPS_COMMLOST = 0x100;
 
 let Service;
@@ -314,8 +314,12 @@ class APCAccess {
   parseLowBatteryValue = () => (this.isLowBattery() ? 'BATTERY_LEVEL_LOW' : 'BATTERY_LEVEL_NORMAL');
 
   // Low when the UPS says so, or when below the optional thresholds from the config
+  // The UPS asks for a new battery; there's no HomeKit field for it, so it's reported as low battery
+  needsNewBattery = () => Boolean(this.parseStatFlag() & UPS_REPLACE_BATT);
+
   isLowBattery = () => {
     if (this.parseStatFlag() & UPS_BATT_LOW) return true;
+    if (this.needsNewBattery()) return true;
     if (!this.loaded) return false;
 
     const level = Number(this.config.lowBatteryLevel);
@@ -328,11 +332,7 @@ class APCAccess {
   };
 
   parseChargingState = () =>
-    this.parseStatFlag() & UPS_NOT_CHARGEABLE
-      ? 'NOT_CHARGEABLE'
-      : this.isOnBattery() || this.parseBatteryLevel() === FULLY_CHARGED
-        ? 'NOT_CHARGING'
-        : 'CHARGING';
+    this.isOnBattery() || this.parseBatteryLevel() === FULLY_CHARGED ? 'NOT_CHARGING' : 'CHARGING';
 
   // Value of the mains power sensor: "triggered" (open / leak / smoke) while on battery
   getPowerSensorValue() {
@@ -359,6 +359,10 @@ class APCAccess {
     const lowBattery = Characteristic.StatusLowBattery[this.parseLowBatteryValue()];
 
     this.log.update[lowBattery ? 'error' : 'info']('Battery state:', lowBattery ? 'Low' : 'Normal');
+    this.log.update[this.needsNewBattery() ? 'warn' : 'info'](
+      'Replace battery:',
+      this.needsNewBattery() ? 'Yes, the UPS reports its battery needs replacing' : 'No',
+    );
 
     if (this.state.lowBattery !== lowBattery) {
       this.log.debug('Pushing low battery state change; ', lowBattery, this.state.lowBattery);
