@@ -38,3 +38,14 @@ test('update logs repeated messages at debug level', () => {
     ['debug', 'Power:', 'Connected'],
   ]);
 });
+
+test('each logger remembers its own last values', () => {
+  const first = recordingLog();
+  const second = recordingLog();
+
+  logMin(first.log).update.info('Power:', 'Connected');
+  logMin(second.log).update.info('Power:', 'Connected');
+
+  assert.deepEqual(first.calls, [['info', 'Power:', 'Connected']]);
+  assert.deepEqual(second.calls, [['info', 'Power:', 'Connected']]);
+});
