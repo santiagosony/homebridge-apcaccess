@@ -1,8 +1,8 @@
 {
-  "displayName": "APC Access",
+  "displayName": "APC UPS (apcupsd)",
   "name": "homebridge-apcaccess",
   "version": "2.0.0",
-  "description": "Homebridge plugin exposing an apcupsd UPS (via its NIS server) as battery, contact and temperature sensors",
+  "description": "Monitor your APC UPS from HomeKit through apcupsd: power cut alerts, battery charge, load, line voltage and temperature",
   "main": "index.js",
   "scripts": {
     "test": "npm run lint && npm run format:check && node --test test/*.test.js",
@@ -47,5 +47,11 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
+  ],
+  "contributors": [
+    {
+      "name": "santiagosony",
+      "url": "https://github.com/santiagosony"
+    }
   ]
 }
