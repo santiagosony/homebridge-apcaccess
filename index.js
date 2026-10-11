@@ -1,11 +1,15 @@
-const ApcAccess = require('apcaccess');
+const { queryStatus } = require('./lib/apcupsd');
 const { logOnlyError, logMin } = require('./lib/logUpdate');
+
+const PLUGIN_NAME = 'homebridge-apcaccess';
+const ACCESSORY_NAME = 'APCAccess';
 
 const DEFAULT_INTERVAL = 1;
 const DEFAULT_NAME = 'APC UPS';
 const DEFAULT_MANUFACTURER = 'American Power Conversion';
 const DEFAULT_MODEL = 'APCAccess UPS';
-const DEFAULT_PORT = '3551';
+const DEFAULT_HOST = 'localhost';
+const DEFAULT_PORT = 3551;
 
 const FULLY_CHARGED = 100;
 const SECOND = 1000;
@@ -20,64 +24,69 @@ let Service;
 let Characteristic;
 
 class APCAccess {
-  constructor(log, config) {
-    if (!config) return;
-
-    this.config = config;
-    this.log = config.errorLogsOnly ? logOnlyError(log) : logMin(log);
-    this.latestJSON = false;
+  constructor(log, config, api) {
+    this.config = config || {};
+    this.log = this.config.errorLogsOnly ? logOnlyError(log) : logMin(log);
+    this.latestJSON = {};
     this.loaded = false;
-
-    this.client = new ApcAccess();
-    this.client
-      .connect(config.host || 'localhost', config.port || DEFAULT_PORT)
-      .then(() => {
-        this.log.info('Connected!');
-        // set up watcher
-        setInterval(this.getLatestJSON.bind(this), (config.interval || DEFAULT_INTERVAL) * SECOND);
-      })
-      .catch((err) => {
-        this.log.error("Couldn't connect to service:", err);
-      });
+    this.connected = false;
+    this.pollTimer = undefined;
 
     this.state = Object.seal({
-      contact: 0,
-      batteryLevel: 0,
-      lowBattery: 0,
-      minutes: 0,
+      contact: undefined,
+      batteryLevel: undefined,
+      lowBattery: undefined,
       chargingState: undefined,
     });
 
-    this.contactSensor = new Service.ContactSensor(config.name || DEFAULT_NAME);
-    this.contactSensor
-      .getCharacteristic(Characteristic.ContactSensorState)
-      .on('get', this.getContactState.bind(this));
+    const name = this.config.name || DEFAULT_NAME;
 
     this.informationService = new Service.AccessoryInformation();
     this.informationService
-      .setCharacteristic(Characteristic.Manufacturer, config.manufacturer || DEFAULT_MANUFACTURER)
-      .setCharacteristic(Characteristic.Model, config.model || DEFAULT_MODEL)
-      .setCharacteristic(Characteristic.Name, config.name || DEFAULT_NAME)
-      .setCharacteristic(Characteristic.SerialNumber, config.serial || UNKNOWN)
-      .setCharacteristic(Characteristic.FirmwareRevision, config.firmwareRevision || UNKNOWN)
-      .setCharacteristic(Characteristic.SoftwareRevision, config.softwareRevision || UNKNOWN);
+      .setCharacteristic(
+        Characteristic.Manufacturer,
+        this.config.manufacturer || DEFAULT_MANUFACTURER,
+      )
+      .setCharacteristic(Characteristic.Model, this.config.model || DEFAULT_MODEL)
+      .setCharacteristic(Characteristic.Name, name)
+      .setCharacteristic(Characteristic.SerialNumber, this.config.serial || UNKNOWN)
+      .setCharacteristic(Characteristic.FirmwareRevision, this.config.firmwareRevision || UNKNOWN)
+      .setCharacteristic(Characteristic.SoftwareRevision, this.config.softwareRevision || UNKNOWN);
 
-    this.batteryService = new Service.BatteryService();
+    this.contactSensor = new Service.ContactSensor(name);
+    this.contactSensor
+      .getCharacteristic(Characteristic.ContactSensorState)
+      .onGet(() => Characteristic.ContactSensorState[this.parseContactValue()]);
+
+    // HAP-NodeJS >= 1.0 (Homebridge 2.x) renamed BatteryService to Battery
+    const BatteryService = Service.Battery || Service.BatteryService;
+    this.batteryService = new BatteryService(name);
     this.batteryService
       .getCharacteristic(Characteristic.BatteryLevel)
-      .on('get', this.getBatteryLevel.bind(this));
+      .onGet(() => this.parseBatteryLevel());
     this.batteryService
       .getCharacteristic(Characteristic.ChargingState)
-      .on('get', this.getChargingState.bind(this));
+      .onGet(() => Characteristic.ChargingState[this.parseChargingState()]);
     this.batteryService
       .getCharacteristic(Characteristic.StatusLowBattery)
-      .on('get', this.getStatusLowBattery.bind(this));
+      .onGet(() => Characteristic.StatusLowBattery[this.parseLowBatteryValue()]);
 
-    if (!this.config.temperatureSensor) return;
-    this.temperatureService = new Service.TemperatureSensor();
-    this.temperatureService
-      .getCharacteristic(Characteristic.CurrentTemperature)
-      .on('get', this.getTemperature.bind(this));
+    if (this.config.temperatureSensor) {
+      this.temperatureService = new Service.TemperatureSensor(name);
+      this.temperatureService
+        .getCharacteristic(Characteristic.CurrentTemperature)
+        .onGet(() => this.getTemperature());
+    }
+
+    // Only start polling once all services exist
+    this.poll();
+
+    if (api) {
+      api.on('shutdown', () => {
+        clearTimeout(this.pollTimer);
+        this.pollTimer = undefined;
+      });
+    }
   }
 
   getServices() {
@@ -91,17 +100,40 @@ class APCAccess {
     return services;
   }
 
-  getLatestJSON() {
-    this.client
-      .getStatusJson()
-      .then((result) => {
-        this.latestJSON = result;
-        this.doPolledChecks();
-        if (!this.loaded) this.firstRun();
-      })
-      .catch((err) => {
-        this.log.error('Polling UPS service failed:', err);
+  async poll() {
+    try {
+      await this.getLatestJSON();
+    } finally {
+      // Schedule the next poll only after this one finished, so requests never pile up
+      this.pollTimer = setTimeout(
+        this.poll.bind(this),
+        (Number(this.config.interval) || DEFAULT_INTERVAL) * SECOND,
+      );
+    }
+  }
+
+  async getLatestJSON() {
+    try {
+      this.latestJSON = await queryStatus({
+        host: this.config.host || DEFAULT_HOST,
+        port: this.config.port || DEFAULT_PORT,
       });
+
+      if (!this.connected) {
+        this.connected = true;
+        this.log.info('Connected!');
+      }
+
+      if (!this.loaded) this.firstRun();
+      this.doPolledChecks();
+    } catch (err) {
+      if (this.connected) {
+        this.connected = false;
+        this.log.error('Lost connection to apcupsd:', err.message);
+      } else {
+        this.log.update.error('Polling UPS service failed:', err.message);
+      }
+    }
   }
 
   firstRun() {
@@ -126,53 +158,47 @@ class APCAccess {
     });
   }
 
-  getBatteryLevel(callback) {
-    callback(null, this.parseBatteryLevel());
-  }
+  getTemperature() {
+    // ITEMP, e.g. "29.2 C"
+    const temperature = parseFloat(this.latestJSON.ITEMP);
 
-  getChargingState(callback) {
-    callback(null, Characteristic.ChargingState[this.parseChargingState()]);
-  }
-
-  getStatusLowBattery(callback) {
-    callback(null, Characteristic.StatusLowBattery[this.parseLowBatteryValue()]);
-  }
-
-  getContactState(callback) {
-    callback(null, Characteristic.ContactSensorState[this.parseContactValue()]);
-  }
-
-  getTemperature(callback) {
-    // ITEMP
-    let tempPctValue = 0;
-    const tempVal = this.latestJSON.ITEMP;
-
-    if (tempVal !== undefined) {
-      const tempArray = tempVal.split('.');
-      tempPctValue = parseInt(tempArray[0], 10);
-      this.log.update.info('Temperature:', tempPctValue);
-    } else if (this.loaded) {
-      this.log.update.error('Unable to determine Temperature');
+    if (Number.isNaN(temperature)) {
+      if (this.loaded) this.log.update.error('Unable to determine Temperature');
+      return 0;
     }
 
-    callback(null, tempPctValue);
+    this.log.update.info('Temperature:', temperature);
+    return temperature;
   }
 
   parseData = (key) => this.latestJSON[key]?.trim() || UNKNOWN;
 
-  parseBatteryLevel = () => (this.loaded ? parseInt(this.latestJSON.BCHARGE, 10) : 0);
+  parseNumber = (key) => {
+    const value = parseInt(this.latestJSON[key], 10);
+    return Number.isNaN(value) ? 0 : value;
+  };
 
-  parseTimeLeft = () => (this.loaded ? parseInt(this.latestJSON.TIMELEFT, 10) : 0);
+  parseStatFlag = () => {
+    const value = Number(this.latestJSON.STATFLAG);
+    return Number.isNaN(value) ? 0 : value;
+  };
 
-  parseContactValue = () => (this.latestJSON.STATFLAG & UPS_ACTIVE ? 'CONTACT_DETECTED' : 'CONTACT_NOT_DETECTED');
+  parseBatteryLevel = () => Math.min(Math.max(this.parseNumber('BCHARGE'), 0), 100);
 
-  parseLowBatteryValue = () => (this.latestJSON.STATFLAG & UPS_BATT_LOW ? 'BATTERY_LEVEL_LOW' : 'BATTERY_LEVEL_NORMAL');
+  parseTimeLeft = () => this.parseNumber('TIMELEFT');
 
-  parseChargingState = () => (this.latestJSON.STATFLAG & UPS_NOT_CHARGEABLE
-    ? 'NOT_CHARGEABLE'
-    : this.latestJSON.STATFLAG & UPS_NOT_CHARGING || this.parseBatteryLevel() === FULLY_CHARGED
-      ? 'NOT_CHARGING'
-      : 'CHARGING');
+  parseContactValue = () =>
+    this.parseStatFlag() & UPS_ACTIVE ? 'CONTACT_DETECTED' : 'CONTACT_NOT_DETECTED';
+
+  parseLowBatteryValue = () =>
+    this.parseStatFlag() & UPS_BATT_LOW ? 'BATTERY_LEVEL_LOW' : 'BATTERY_LEVEL_NORMAL';
+
+  parseChargingState = () =>
+    this.parseStatFlag() & UPS_NOT_CHARGEABLE
+      ? 'NOT_CHARGEABLE'
+      : this.parseStatFlag() & UPS_NOT_CHARGING || this.parseBatteryLevel() === FULLY_CHARGED
+        ? 'NOT_CHARGING'
+        : 'CHARGING';
 
   checkContact() {
     const contactBool = Characteristic.ContactSensorState[this.parseContactValue()];
@@ -181,9 +207,7 @@ class APCAccess {
 
     if (this.state.contact !== contactBool) {
       this.log.debug('Pushing contact state change; ', contactBool, this.state.contact);
-      this.contactSensor
-        .getCharacteristic(Characteristic.ContactSensorState)
-        .updateValue(contactBool);
+      this.contactSensor.updateCharacteristic(Characteristic.ContactSensorState, contactBool);
       this.state.contact = contactBool;
     }
   }
@@ -195,9 +219,7 @@ class APCAccess {
 
     if (this.state.lowBattery !== lowBattery) {
       this.log.debug('Pushing low battery state change; ', lowBattery, this.state.lowBattery);
-      this.batteryService
-        .getCharacteristic(Characteristic.StatusLowBattery)
-        .updateValue(lowBattery);
+      this.batteryService.updateCharacteristic(Characteristic.StatusLowBattery, lowBattery);
       this.state.lowBattery = lowBattery;
     }
   }
@@ -210,9 +232,7 @@ class APCAccess {
 
     if (this.state.chargingState !== chargingState) {
       this.log.debug('Pushing charging state change; ', chargingState, this.state.chargingState);
-      this.batteryService
-        .getCharacteristic(Characteristic.ChargingState)
-        .updateValue(chargingState);
+      this.batteryService.updateCharacteristic(Characteristic.ChargingState, chargingState);
       this.state.chargingState = chargingState;
     }
   }
@@ -229,9 +249,18 @@ class APCAccess {
       );
       this.log.debug('Pushing battery level change; ', batteryLevel, this.state.batteryLevel);
 
-      this.batteryService.getCharacteristic(Characteristic.BatteryLevel).updateValue(batteryLevel);
+      this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, batteryLevel);
       this.state.batteryLevel = batteryLevel;
     }
+  }
+
+  checkTemperature() {
+    if (!this.temperatureService) return;
+
+    this.temperatureService.updateCharacteristic(
+      Characteristic.CurrentTemperature,
+      this.getTemperature(),
+    );
   }
 
   doPolledChecks() {
@@ -239,11 +268,12 @@ class APCAccess {
     this.checkLowBattery();
     this.checkCharging();
     this.checkBatteryLevel();
+    this.checkTemperature();
   }
 }
 
-module.exports = (homebridge) => {
-  Service = homebridge.hap.Service;
-  Characteristic = homebridge.hap.Characteristic;
-  homebridge.registerAccessory('homebridge-apcaccess', 'APCAccess', APCAccess);
+module.exports = (api) => {
+  Service = api.hap.Service;
+  Characteristic = api.hap.Characteristic;
+  api.registerAccessory(PLUGIN_NAME, ACCESSORY_NAME, APCAccess);
 };

@@ -1,3 +1,14 @@
+# [2.0.0]
+
+- Homebridge 2.x support (tested with v2.4.0), while keeping Homebridge 1.8+ working.
+  - Use `Service.Battery` (HAP-NodeJS 1.x/2.x removed `Service.BatteryService`, which caused `TypeError: Service.BatteryService is not a constructor`).
+  - Replace deprecated `on('get', callback)` handlers with `onGet`.
+- Replace the unmaintained `apcaccess` dependency with a small built-in apcupsd NIS client: a new connection per poll, with a 5s timeout, so the plugin recovers by itself when apcupsd restarts or the network drops.
+- Polling no longer overlaps (next poll is scheduled after the previous one finishes) and starts only after all services exist; it stops on Homebridge shutdown.
+- Temperature sensor value is now pushed to HomeKit on every poll and keeps decimals.
+- Add `config.schema.json` for the Homebridge UI.
+- Tooling: ESLint 9 (flat config), Prettier 3, `node:test` unit tests; drop `prettier-eslint` and `eslint-config-airbnb-base`.
+
 # [1.0.3]
 
 - Remove instances of WARN, log as INFO or ERROR only to clean up suppression.

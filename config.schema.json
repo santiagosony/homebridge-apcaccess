@@ -1,0 +1,61 @@
+{
+  "pluginAlias": "APCAccess",
+  "pluginType": "accessory",
+  "singular": false,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "APC UPS",
+        "required": true
+      },
+      "host": {
+        "title": "apcupsd host",
+        "type": "string",
+        "default": "localhost",
+        "description": "Host running apcupsd with its Network Information Server (NIS) enabled."
+      },
+      "port": {
+        "title": "apcupsd NIS port",
+        "type": "integer",
+        "default": 3551,
+        "minimum": 1,
+        "maximum": 65535
+      },
+      "interval": {
+        "title": "Polling interval (seconds)",
+        "type": "number",
+        "default": 1,
+        "minimum": 1
+      },
+      "temperatureSensor": {
+        "title": "Expose temperature sensor",
+        "type": "boolean",
+        "default": false,
+        "description": "Only for UPS models that report ITEMP."
+      },
+      "errorLogsOnly": {
+        "title": "Only log errors",
+        "type": "boolean",
+        "default": false
+      },
+      "manufacturer": {
+        "title": "Manufacturer",
+        "type": "string",
+        "default": "American Power Conversion"
+      },
+      "model": {
+        "title": "Model",
+        "type": "string",
+        "description": "Overwritten with the model reported by the UPS once connected."
+      },
+      "serial": {
+        "title": "Serial number",
+        "type": "string",
+        "description": "Overwritten with the serial reported by the UPS once connected."
+      }
+    }
+  }
+}

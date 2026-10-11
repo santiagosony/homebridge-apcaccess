@@ -1,15 +1,23 @@
 # homebridge-apcaccess
 
-An [apcaccess](https://github.com/mapero/apcaccess) wrapper for [Homebridge](https://github.com/nfarina/homebridge). Supports precisely one UPS. If you're on battery power, the Contact Sensor is open.
+An [apcaccess](https://github.com/mapero/apcaccess) wrapper for [Homebridge](https://github.com/homebridge/homebridge). Supports precisely one UPS. If you're on battery power, the Contact Sensor is open.
 
 <img src="https://user-images.githubusercontent.com/1850718/75247783-a0bd6b00-57ca-11ea-9391-0db0afdaf2cf.PNG" width="250" align="right"/>
 
 This accessory:
 
 - Is essentially a worse version of [homespun/homebridge-accessory-apcupsd](https://github.com/homespun/homebridge-accessory-apcupsd) which I was too dumb to get working.
-- Publishes a `BatteryService` to show charging state / battery levels.
+- Publishes a `Battery` service to show charging state / battery levels.
 - Publishes `ContactSensor` two subscribable events: `Contact State` and `Low Battery`, for your push alerting pleasure.
 - Optionally publishes a `TemperatureSensor` if you have a fancy UPS which reports this.
+
+## Requirements
+
+- Homebridge `^1.8.0` or `^2.0.0` (tested with v2.4.0)
+- Node.js 20, 22, 24 or 26 (Homebridge 2.x itself requires Node.js 22+)
+- [apcupsd](http://www.apcupsd.org/) with its Network Information Server enabled (`NETSERVER on` in `apcupsd.conf`)
+
+The plugin has no runtime dependencies: it talks to apcupsd's NIS protocol directly.
 
 ## Configuration
 
@@ -20,7 +28,7 @@ The plugin will run with these default values, they can be changed in the `acces
     "name": "APC UPS",
     "host": "127.0.0.1",
     "port": 3551,
-    "manufacturer": "American Power Conversion'",
+    "manufacturer": "American Power Conversion",
     "model": "APCAccess UPS",
     "serial": "unknown",
     "interval": 1,
@@ -30,3 +38,12 @@ The plugin will run with these default values, they can be changed in the `acces
 ```
 
 `interval` is in seconds.
+
+The plugin also ships a `config.schema.json`, so it can be configured from the Homebridge UI.
+
+## Development
+
+```sh
+npm install
+npm test   # eslint + prettier check + unit tests (includes a test against Homebridge 2's HAP-NodeJS)
+```
