@@ -154,3 +154,32 @@ for (const [type, service, characteristic, value] of [
     );
   });
 }
+
+test('shows "No Response" while apcupsd is unreachable', async (t) => {
+  // Nothing listens on port 1
+  const { accessory, hap } = await createAccessory(t, { port: 1 });
+  const { Characteristic, HapStatusError } = hap;
+
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(accessory.connected, false);
+
+  const handler = accessory.batteryService.getCharacteristic(
+    Characteristic.BatteryLevel,
+  ).getHandler;
+  assert.throws(handler, HapStatusError);
+});
+
+test('only gives up on apcupsd after several failed polls in a row', async (t) => {
+  const { accessory } = await createAccessory(t, {});
+  await waitForFirstPoll(accessory);
+  assert.equal(accessory.connected, true);
+
+  accessory.config.port = 1;
+  await accessory.getLatestJSON();
+  await accessory.getLatestJSON();
+  assert.equal(accessory.connected, true);
+
+  await accessory.getLatestJSON();
+  assert.equal(accessory.connected, false);
+  assert.equal(accessory.state.batteryLevel, undefined);
+});

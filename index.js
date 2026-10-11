@@ -12,6 +12,8 @@ const DEFAULT_HOST = 'localhost';
 const DEFAULT_PORT = 3551;
 
 const FULLY_CHARGED = 100;
+// Consecutive failed polls before HomeKit shows the UPS as "No Response"
+const MAX_FAILED_POLLS = 3;
 const SECOND = 1000;
 const UNKNOWN = 'unknown';
 
@@ -53,6 +55,8 @@ const UPS_NOT_CHARGING = 0x10;
 
 let Service;
 let Characteristic;
+let HapStatusError;
+let HAPStatus;
 
 class APCAccess {
   constructor(log, config, api) {
@@ -61,6 +65,7 @@ class APCAccess {
     this.latestJSON = {};
     this.loaded = false;
     this.connected = false;
+    this.failedPolls = 0;
     this.pollTimer = undefined;
 
     this.state = Object.seal({
@@ -97,7 +102,7 @@ class APCAccess {
       this.powerService = new Service[this.powerSensor.service](name);
       this.powerService
         .getCharacteristic(Characteristic[this.powerSensor.characteristic])
-        .onGet(() => this.getPowerSensorValue());
+        .onGet(this.whenConnected(() => this.getPowerSensorValue()));
     }
 
     // HAP-NodeJS >= 1.0 (Homebridge 2.x) renamed BatteryService to Battery
@@ -105,19 +110,21 @@ class APCAccess {
     this.batteryService = this.withConfiguredName(new BatteryService(`${name} Charge`, 'charge'));
     this.batteryService
       .getCharacteristic(Characteristic.BatteryLevel)
-      .onGet(() => this.parseBatteryLevel());
+      .onGet(this.whenConnected(() => this.parseBatteryLevel()));
     this.batteryService
       .getCharacteristic(Characteristic.ChargingState)
-      .onGet(() => Characteristic.ChargingState[this.parseChargingState()]);
+      .onGet(this.whenConnected(() => Characteristic.ChargingState[this.parseChargingState()]));
     this.batteryService
       .getCharacteristic(Characteristic.StatusLowBattery)
-      .onGet(() => Characteristic.StatusLowBattery[this.parseLowBatteryValue()]);
+      .onGet(
+        this.whenConnected(() => Characteristic.StatusLowBattery[this.parseLowBatteryValue()]),
+      );
 
     if (this.config.temperatureSensor) {
       this.temperatureService = new Service.TemperatureSensor(name);
       this.temperatureService
         .getCharacteristic(Characteristic.CurrentTemperature)
-        .onGet(() => this.getTemperature());
+        .onGet(this.whenConnected(() => this.getTemperature()));
     }
 
     if (this.config.loadSensor) {
@@ -127,7 +134,7 @@ class APCAccess {
       );
       this.loadService
         .getCharacteristic(Characteristic.CurrentRelativeHumidity)
-        .onGet(() => this.getLoad());
+        .onGet(this.whenConnected(() => this.getLoad()));
     }
 
     // Only start polling once all services exist
@@ -140,6 +147,17 @@ class APCAccess {
       });
     }
   }
+
+  // Wraps an onGet handler so HomeKit shows "No Response" while apcupsd can't be reached,
+  // instead of the last known (and possibly wrong) values
+  whenConnected = (getValue) => () => {
+    if (!this.connected) {
+      throw HapStatusError
+        ? new HapStatusError(HAPStatus.SERVICE_COMMUNICATION_FAILURE)
+        : new Error('apcupsd is not reachable');
+    }
+    return getValue();
+  };
 
   // iOS shows ConfiguredName, not Name, for the extra services of an accessory
   withConfiguredName = (service) => {
@@ -188,6 +206,7 @@ class APCAccess {
         port: Number(this.config.port) || DEFAULT_PORT,
       });
 
+      this.failedPolls = 0;
       if (!this.connected) {
         this.connected = true;
         this.log.info('Connected!');
@@ -196,9 +215,18 @@ class APCAccess {
       if (!this.loaded) this.firstRun();
       this.doPolledChecks();
     } catch (err) {
-      if (this.connected) {
+      this.failedPolls += 1;
+
+      if (this.connected && this.failedPolls >= MAX_FAILED_POLLS) {
         this.connected = false;
-        this.log.error('Lost connection to apcupsd:', err.message);
+        this.log.error(
+          'Lost connection to apcupsd, the UPS will show as not responding:',
+          err.message,
+        );
+        // Forget what HomeKit was told, so everything is pushed again once reconnected
+        Object.keys(this.state).forEach((key) => {
+          this.state[key] = undefined;
+        });
       } else {
         this.log.update.error('Polling UPS service failed:', err.message);
       }
@@ -371,5 +399,6 @@ class APCAccess {
 module.exports = (api) => {
   Service = api.hap.Service;
   Characteristic = api.hap.Characteristic;
+  ({ HapStatusError, HAPStatus } = api.hap);
   api.registerAccessory(PLUGIN_NAME, ACCESSORY_NAME, APCAccess);
 };
