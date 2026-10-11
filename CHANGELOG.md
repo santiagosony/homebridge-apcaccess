@@ -7,7 +7,7 @@
 - Polling no longer overlaps (next poll is scheduled after the previous one finishes) and starts only after all services exist; it stops on Homebridge shutdown.
 - Temperature sensor value is now pushed to HomeKit on every poll and keeps decimals.
 - Add `config.schema.json` for the Homebridge UI: host and port side by side (port is a plain number field), temperature sensor explained (ITEMP is only reported by Smart-UPS models), polling/logging and accessory information grouped in collapsed sections. Empty fields fall back to the defaults.
-- The battery service is now named `<name> Charge` (e.g. "UPS Charge").
+- Services are now named after what they show: `<name> Charge` (battery), `<name> Power` (mains power sensor) and `<name> Temperature`, e.g. "UPS Charge".
 - New `contactSensor` option (default `true`) to hide the mains power contact sensor, and `powerSensorType` (`contact`, `leak` or `smoke`) to publish it as a leak or smoke sensor so power cuts arrive as HomeKit critical alerts.
 - New optional `voltageSensor`: exposes the input line voltage (`LINEV`) as a light sensor (lux = volts).
 - New optional `loadSensor`: exposes the UPS load (`LOADPCT`) as a humidity sensor, HomeKit's closest 0-100 % reading.

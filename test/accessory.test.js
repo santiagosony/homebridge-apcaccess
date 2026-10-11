@@ -104,6 +104,11 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
   assert.equal(value(accessory.loadService, Characteristic.CurrentRelativeHumidity), 23);
   assert.equal(value(accessory.loadService, Characteristic.ConfiguredName), 'UPS Load');
   assert.equal(value(accessory.batteryService, Characteristic.Name), 'UPS Charge');
+  assert.equal(value(accessory.powerService, Characteristic.ConfiguredName), 'UPS Power');
+  assert.equal(
+    value(accessory.temperatureService, Characteristic.ConfiguredName),
+    'UPS Temperature',
+  );
   assert.equal(value(accessory.batteryService, Characteristic.ConfiguredName), 'UPS Charge');
   assert.equal(value(accessory.informationService, Characteristic.SerialNumber), '3B1234X56789');
 

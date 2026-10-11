@@ -101,7 +101,9 @@ class APCAccess {
     // Enabled unless explicitly turned off, to keep the behaviour of older versions
     if (this.config.contactSensor !== false) {
       this.powerSensor = POWER_SENSORS[this.config.powerSensorType] || POWER_SENSORS.contact;
-      this.powerService = new Service[this.powerSensor.service](name);
+      this.powerService = this.withConfiguredName(
+        new Service[this.powerSensor.service](`${name} Power`),
+      );
       this.powerService
         .getCharacteristic(Characteristic[this.powerSensor.characteristic])
         .onGet(this.whenConnected(() => this.getPowerSensorValue()));
@@ -123,7 +125,9 @@ class APCAccess {
       );
 
     if (this.config.temperatureSensor) {
-      this.temperatureService = new Service.TemperatureSensor(name);
+      this.temperatureService = this.withConfiguredName(
+        new Service.TemperatureSensor(`${name} Temperature`),
+      );
       this.temperatureService
         .getCharacteristic(Characteristic.CurrentTemperature)
         .onGet(this.whenConnected(() => this.getTemperature()));
