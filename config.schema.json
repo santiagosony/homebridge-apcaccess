@@ -104,11 +104,6 @@
         "default": false,
         "description": "Hide the informational log lines (power, battery and charging state changes)."
       },
-      "manufacturer": {
-        "title": "Manufacturer",
-        "type": "string",
-        "placeholder": "American Power Conversion"
-      },
       "model": {
         "title": "Model",
         "type": "string",
@@ -178,7 +173,6 @@
       "expandable": true,
       "expanded": false,
       "items": [
-        "manufacturer",
         "model",
         "serial",
         "firmwareRevision"

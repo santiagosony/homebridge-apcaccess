@@ -114,6 +114,7 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
   assert.equal(await read(Characteristic.FirmwareRevision), '924.Z3 .I USB FW:Z3');
   assert.equal(await read(Characteristic.SoftwareRevision), '3.14.14 (31 May 2016) debian');
   assert.equal(await read(Characteristic.Name), 'UPS');
+  assert.equal(await read(Characteristic.Manufacturer), 'APC');
 
   // onGet handlers answer HomeKit reads
   assert.equal(

@@ -6,7 +6,7 @@ const ACCESSORY_NAME = 'APCAccess';
 
 const DEFAULT_INTERVAL = 1;
 const DEFAULT_NAME = 'APC UPS';
-const DEFAULT_MANUFACTURER = 'American Power Conversion';
+const DEFAULT_MANUFACTURER = 'APC';
 const DEFAULT_MODEL = 'APCAccess UPS';
 const DEFAULT_HOST = 'localhost';
 const DEFAULT_PORT = 3551;
@@ -80,6 +80,7 @@ class APCAccess {
 
     this.informationService = new Service.AccessoryInformation();
     this.informationService
+      // apcupsd doesn't report a manufacturer; `manufacturer` is still honoured for older configs
       .setCharacteristic(
         Characteristic.Manufacturer,
         this.config.manufacturer || DEFAULT_MANUFACTURER,
