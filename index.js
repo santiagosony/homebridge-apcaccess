@@ -75,7 +75,7 @@ class APCAccess {
 
     // HAP-NodeJS >= 1.0 (Homebridge 2.x) renamed BatteryService to Battery
     const BatteryService = Service.Battery || Service.BatteryService;
-    this.batteryService = new BatteryService(name);
+    this.batteryService = this.withConfiguredName(new BatteryService(`${name} Charge`, 'charge'));
     this.batteryService
       .getCharacteristic(Characteristic.BatteryLevel)
       .onGet(() => this.parseBatteryLevel());
@@ -95,11 +95,9 @@ class APCAccess {
 
     if (this.config.loadSensor) {
       // HomeKit has no "load" sensor; a humidity sensor is the closest built-in 0-100 % reading
-      const loadName = `${name} Load`;
-      this.loadService = new Service.HumiditySensor(loadName, 'load');
-      if (Characteristic.ConfiguredName) {
-        this.loadService.setCharacteristic(Characteristic.ConfiguredName, loadName);
-      }
+      this.loadService = this.withConfiguredName(
+        new Service.HumiditySensor(`${name} Load`, 'load'),
+      );
       this.loadService
         .getCharacteristic(Characteristic.CurrentRelativeHumidity)
         .onGet(() => this.getLoad());
@@ -115,6 +113,14 @@ class APCAccess {
       });
     }
   }
+
+  // iOS shows ConfiguredName, not Name, for the extra services of an accessory
+  withConfiguredName = (service) => {
+    if (Characteristic.ConfiguredName) {
+      service.setCharacteristic(Characteristic.ConfiguredName, service.displayName);
+    }
+    return service;
+  };
 
   getServices() {
     // Required by Homebridge; expose services this accessory claims to have
