@@ -68,10 +68,13 @@ class APCAccess {
         .onGet(getValue);
     });
 
-    this.contactSensor = new Service.ContactSensor(name);
-    this.contactSensor
-      .getCharacteristic(Characteristic.ContactSensorState)
-      .onGet(() => Characteristic.ContactSensorState[this.parseContactValue()]);
+    // Enabled unless explicitly turned off, to keep the behaviour of older versions
+    if (this.config.contactSensor !== false) {
+      this.contactSensor = new Service.ContactSensor(name);
+      this.contactSensor
+        .getCharacteristic(Characteristic.ContactSensorState)
+        .onGet(() => Characteristic.ContactSensorState[this.parseContactValue()]);
+    }
 
     // HAP-NodeJS >= 1.0 (Homebridge 2.x) renamed BatteryService to Battery
     const BatteryService = Service.Battery || Service.BatteryService;
@@ -124,7 +127,9 @@ class APCAccess {
 
   getServices() {
     // Required by Homebridge; expose services this accessory claims to have
-    const services = [this.informationService, this.contactSensor, this.batteryService];
+    const services = [this.informationService, this.contactSensor, this.batteryService].filter(
+      Boolean,
+    );
 
     if (this.temperatureService) {
       services.push(this.temperatureService);
@@ -241,7 +246,7 @@ class APCAccess {
 
     this.log.update.info('Power:', contactBool ? 'Disconnected' : 'Connected');
 
-    if (this.state.contact !== contactBool) {
+    if (this.contactSensor && this.state.contact !== contactBool) {
       this.log.debug('Pushing contact state change; ', contactBool, this.state.contact);
       this.contactSensor.updateCharacteristic(Characteristic.ContactSensorState, contactBool);
       this.state.contact = contactBool;

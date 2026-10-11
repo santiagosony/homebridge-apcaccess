@@ -8,6 +8,7 @@
 - Temperature sensor value is now pushed to HomeKit on every poll and keeps decimals.
 - Add `config.schema.json` for the Homebridge UI: host and port side by side (port is a plain number field), temperature sensor explained (ITEMP is only reported by Smart-UPS models), polling/logging and accessory information grouped in collapsed sections. Empty fields fall back to the defaults.
 - The battery service is now named `<name> Charge` (e.g. "UPS Charge").
+- New `contactSensor` option (default `true`) to hide the mains power contact sensor.
 - New optional `loadSensor`: exposes the UPS load (`LOADPCT`) as a humidity sensor, HomeKit's closest 0-100 % reading.
 - Polling interval is clamped to at least 1 second.
 - Model, serial number and firmware/software revision reported by the UPS now actually show up in HomeKit and the Homebridge UI (served through `onGet`, since Homebridge copies the required AccessoryInformation values only once at startup). The accessory name always comes from the `name` config option; the UPS name is only logged.

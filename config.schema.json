@@ -24,6 +24,12 @@
         "placeholder": 3551,
         "description": "Leave empty to use apcupsd's default NIS port (3551)."
       },
+      "contactSensor": {
+        "title": "Expose a contact sensor for mains power",
+        "type": "boolean",
+        "default": true,
+        "description": "Open when the UPS is running on battery, closed when mains power is connected. Turn off if you only want the battery status."
+      },
       "temperatureSensor": {
         "title": "Expose a temperature sensor",
         "type": "boolean",
@@ -90,6 +96,7 @@
         }
       ]
     },
+    "contactSensor",
     "temperatureSensor",
     "loadSensor",
     {

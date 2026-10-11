@@ -25,9 +25,8 @@ const silentLog = () => {
   return log;
 };
 
-test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
+const createAccessory = async (t, config) => {
   const { HAPLibraryVersion, ...hap } = await import('@homebridge/hap-nodejs');
-  const { Characteristic, Service } = hap;
   const server = await startFakeApcupsd(STATUS);
 
   const api = new EventEmitter();
@@ -43,20 +42,30 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
 
   const accessory = new Accessory(
     silentLog(),
-    {
-      name: 'UPS',
-      host: '127.0.0.1',
-      port: server.address().port,
-      interval: 60,
-      temperatureSensor: true,
-      loadSensor: true,
-    },
+    { name: 'UPS', host: '127.0.0.1', port: server.address().port, interval: 60, ...config },
     api,
   );
   t.after(() => {
     api.emit('shutdown');
     server.close();
   });
+
+  return { accessory, hap };
+};
+
+const waitForFirstPoll = async (accessory) => {
+  for (let i = 0; i < 50 && !accessory.loaded; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.ok(accessory.loaded);
+};
+
+test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
+  const { accessory, hap } = await createAccessory(t, {
+    temperatureSensor: true,
+    loadSensor: true,
+  });
+  const { Characteristic, Service } = hap;
 
   const services = accessory.getServices();
   assert.equal(services.length, 5);
@@ -66,11 +75,7 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
   const bridgedInfo = new Service.AccessoryInformation();
   bridgedInfo.replaceCharacteristicsFromService(accessory.informationService);
 
-  // Wait for the first poll to land
-  for (let i = 0; i < 50 && !accessory.loaded; i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-  assert.ok(accessory.loaded);
+  await waitForFirstPoll(accessory);
 
   const value = (service, characteristic) => service.getCharacteristic(characteristic).value;
 
@@ -111,4 +116,15 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
       .handleGetRequest(),
     42,
   );
+});
+
+test('the contact sensor can be turned off', async (t) => {
+  const { accessory, hap } = await createAccessory(t, { contactSensor: false });
+  const { Characteristic, Service } = hap;
+  await waitForFirstPoll(accessory);
+
+  const services = accessory.getServices();
+  assert.equal(services.length, 2);
+  assert.ok(!services.some((service) => service instanceof Service.ContactSensor));
+  assert.equal(accessory.batteryService.getCharacteristic(Characteristic.BatteryLevel).value, 42);
 });
