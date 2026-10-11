@@ -69,7 +69,7 @@
         "title": "Expose a load sensor",
         "type": "boolean",
         "default": false,
-        "description": "Publishes the UPS load (apcupsd's LOADPCT value, % of its rated power in use). HomeKit has no load sensor type, so it shows up as a humidity sensor named \"<Name> Load\"."
+        "description": "Publishes the UPS load (apcupsd's LOADPCT value, % of its rated power in use). HomeKit has no load sensor type, so it shows up as a light sensor named \"<Name> Load\": 23 lux means 23 %."
       },
       "voltageSensor": {
         "title": "Expose a line voltage sensor",

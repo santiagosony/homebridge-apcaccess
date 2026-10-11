@@ -11,7 +11,7 @@
 - New `contactSensor` option (default `true`) to hide the mains power contact sensor, and `powerSensorType` (`contact`, `leak` or `smoke`) to publish it as a leak or smoke sensor so power cuts arrive as HomeKit critical alerts.
 - Line voltage is only logged with the new `logVoltage` option, and only when it changed at least `voltageLogThreshold` % (default 5) since the last logged value.
 - New optional `voltageSensor`: exposes the input line voltage (`LINEV`) as a light sensor (lux = volts).
-- New optional `loadSensor`: exposes the UPS load (`LOADPCT`) as a humidity sensor, HomeKit's closest 0-100 % reading.
+- New optional `loadSensor`: exposes the UPS load (`LOADPCT`) as a light sensor (lux = %), the same type as the voltage sensor.
 - Fix: with `errorLogsOnly` enabled, a low battery or an unreachable apcupsd threw `update.error is not a function`, which could stop Homebridge. Unexpected polling errors are now always caught and logged.
 - When apcupsd can't be reached (at startup, or after 3 failed polls in a row) the UPS shows as "No Response" in HomeKit instead of its last known values.
 - With several UPS configured, each one now keeps its own log de-duplication, so one UPS no longer hides another's log lines.

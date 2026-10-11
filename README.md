@@ -8,17 +8,17 @@ Several UPS are supported: add one accessory per apcupsd instance.
 
 Each service is named after the accessory `name` (`UPS` in these examples):
 
-| Service             | HomeKit type                            | Shows                                         | Option                             |
-| ------------------- | --------------------------------------- | --------------------------------------------- | ---------------------------------- |
-| **UPS Power**       | Contact sensor (or leak / smoke sensor) | Open / leak / smoke while running on battery  | `contactSensor`, `powerSensorType` |
-| **UPS Charge**      | Battery                                 | Charge %, charging state, low battery         | always                             |
-| **UPS Temperature** | Temperature sensor                      | UPS internal temperature (`ITEMP`)            | `temperatureSensor`                |
-| **UPS Load**        | Humidity sensor                         | Load, % of rated power in use (`LOADPCT`)     | `loadSensor`                       |
-| **UPS Voltage**     | Light sensor                            | Input line voltage (`LINEV`), 222 lux = 222 V | `voltageSensor`                    |
+| Service             | HomeKit type                            | Shows                                                    | Option                             |
+| ------------------- | --------------------------------------- | -------------------------------------------------------- | ---------------------------------- |
+| **UPS Power**       | Contact sensor (or leak / smoke sensor) | Open / leak / smoke while running on battery             | `contactSensor`, `powerSensorType` |
+| **UPS Charge**      | Battery                                 | Charge %, charging state, low battery                    | always                             |
+| **UPS Temperature** | Temperature sensor                      | UPS internal temperature (`ITEMP`)                       | `temperatureSensor`                |
+| **UPS Load**        | Light sensor                            | Load, % of rated power in use (`LOADPCT`), 23 lux = 23 % | `loadSensor`                       |
+| **UPS Voltage**     | Light sensor                            | Input line voltage (`LINEV`), 222 lux = 222 V            | `voltageSensor`                    |
 
 - **Power cut alerts:** the power sensor is a contact sensor by default. Set `powerSensorType` to `leak` or `smoke` to get HomeKit **critical alerts**, which get through Do Not Disturb and Focus. The Home app will word them as a leak or smoke alarm.
 - **Low battery** is reported when the UPS flags it, when it asks for a new battery, or below the optional `lowBatteryLevel` / `lowBatteryMinutes` thresholds.
-- **Load and voltage** use humidity and light sensors because HomeKit has no load or voltage sensor types.
+- **Load and voltage** use light sensors because HomeKit has no load or voltage sensor types (a light sensor accepts any positive number, and keeps them apart from the room's real humidity sensors).
 - **Temperature** is only reported by Smart-UPS models. Back-UPS and most consumer models don't have it.
 - **No Response:** if apcupsd can't be reached, or it loses contact with the UPS (`COMMLOST`), the accessory shows as "No Response" instead of stale values.
 - **Accessory information:** model, serial number, firmware and apcupsd version are read from the UPS.

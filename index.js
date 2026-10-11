@@ -139,12 +139,11 @@ class APCAccess {
     }
 
     if (this.config.loadSensor) {
-      // HomeKit has no "load" sensor; a humidity sensor is the closest built-in 0-100 % reading
-      this.loadService = this.withConfiguredName(
-        new Service.HumiditySensor(`${name} Load`, 'load'),
-      );
+      // HomeKit has no "load" sensor; a light sensor accepts any positive reading (shown as lux).
+      // Same type as the voltage sensor, and it doesn't mix with the room's humidity sensors.
+      this.loadService = this.withConfiguredName(new Service.LightSensor(`${name} Load`, 'load'));
       this.loadService
-        .getCharacteristic(Characteristic.CurrentRelativeHumidity)
+        .getCharacteristic(Characteristic.CurrentAmbientLightLevel)
         .onGet(this.whenConnected(() => this.getLoad()));
     }
 
@@ -418,17 +417,18 @@ class APCAccess {
 
     if (Number.isNaN(load)) {
       if (this.loaded) this.log.update.error('Unable to determine Load');
-      return 0;
+      return MIN_LIGHT_LEVEL;
     }
 
     this.log.update.info('Load:', `${load}%`);
-    return Math.min(Math.max(load, 0), 100);
+    // CurrentAmbientLightLevel can't go below 0.0001
+    return Math.max(load, MIN_LIGHT_LEVEL);
   }
 
   checkLoad() {
     if (!this.loadService) return;
 
-    this.loadService.updateCharacteristic(Characteristic.CurrentRelativeHumidity, this.getLoad());
+    this.loadService.updateCharacteristic(Characteristic.CurrentAmbientLightLevel, this.getLoad());
   }
 
   getVoltage() {
