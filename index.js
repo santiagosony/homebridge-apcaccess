@@ -49,10 +49,11 @@ const POWER_SENSORS = {
   },
 };
 
-const UPS_ACTIVE = 0x08;
+// STATFLAG bits, as defined in apcupsd's include/defines.h
+const UPS_ONBATT = 0x10;
 const UPS_BATT_LOW = 0x40;
 const UPS_NOT_CHARGEABLE = 0x80;
-const UPS_NOT_CHARGING = 0x10;
+const UPS_COMMLOST = 0x100;
 
 let Service;
 let Characteristic;
@@ -221,10 +222,18 @@ class APCAccess {
 
   async getLatestJSON() {
     try {
-      this.latestJSON = await queryStatus({
+      const status = await queryStatus({
         host: this.config.host || DEFAULT_HOST,
         port: Number(this.config.port) || DEFAULT_PORT,
       });
+
+      // apcupsd still answers when it can't talk to the UPS (e.g. USB cable unplugged), but the
+      // flags are then stale or cleared, which would look like a power cut
+      if (Number(status.STATFLAG) & UPS_COMMLOST) {
+        throw new Error('apcupsd lost communication with the UPS (COMMLOST)');
+      }
+
+      this.latestJSON = status;
 
       this.failedPolls = 0;
       if (!this.connected) {
@@ -239,10 +248,7 @@ class APCAccess {
 
       if (this.connected && this.failedPolls >= MAX_FAILED_POLLS) {
         this.connected = false;
-        this.log.error(
-          'Lost connection to apcupsd, the UPS will show as not responding:',
-          err.message,
-        );
+        this.log.error('Lost connection to the UPS, it will show as not responding:', err.message);
         // Forget what HomeKit was told, so everything is pushed again once reconnected
         Object.keys(this.state).forEach((key) => {
           this.state[key] = undefined;
@@ -303,7 +309,7 @@ class APCAccess {
 
   parseTimeLeft = () => this.parseNumber('TIMELEFT');
 
-  isOnBattery = () => !(this.parseStatFlag() & UPS_ACTIVE);
+  isOnBattery = () => Boolean(this.parseStatFlag() & UPS_ONBATT);
 
   parseLowBatteryValue = () => (this.isLowBattery() ? 'BATTERY_LEVEL_LOW' : 'BATTERY_LEVEL_NORMAL');
 
@@ -324,7 +330,7 @@ class APCAccess {
   parseChargingState = () =>
     this.parseStatFlag() & UPS_NOT_CHARGEABLE
       ? 'NOT_CHARGEABLE'
-      : this.parseStatFlag() & UPS_NOT_CHARGING || this.parseBatteryLevel() === FULLY_CHARGED
+      : this.isOnBattery() || this.parseBatteryLevel() === FULLY_CHARGED
         ? 'NOT_CHARGING'
         : 'CHARGING';
 

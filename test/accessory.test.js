@@ -253,3 +253,20 @@ test('the line voltage sensor handles a power cut (0 V)', async (t) => {
     0.0001,
   );
 });
+
+test('COMMLOST is "No Response", not a power cut', async (t) => {
+  // apcupsd answers, but has lost the UPS: online/on battery bits cleared, commlost set
+  const status = STATUS.map((line) =>
+    line.startsWith('STATFLAG') ? 'STATFLAG : 0x05000100' : line,
+  );
+  const { accessory, hap } = await createAccessory(t, { status, powerSensorType: 'leak' });
+  const { Characteristic, HapStatusError } = hap;
+
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(accessory.connected, false);
+  assert.equal(accessory.loaded, false);
+
+  const leak = accessory.powerService.getCharacteristic(Characteristic.LeakDetected);
+  assert.throws(leak.getHandler, HapStatusError);
+  assert.notEqual(leak.value, Characteristic.LeakDetected.LEAK_DETECTED);
+});

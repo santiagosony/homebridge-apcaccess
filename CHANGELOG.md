@@ -16,6 +16,7 @@
 - With several UPS configured, each one now keeps its own log de-duplication, so one UPS no longer hides another's log lines.
 - New optional `lowBatteryLevel` (%) and `lowBatteryMinutes` (runtime left while on battery) thresholds to report low battery before the UPS does.
 - Manufacturer now defaults to `APC` and is no longer asked for in the settings form (`manufacturer` in `config.json` is still honoured).
+- Fix: when apcupsd loses the UPS (`COMMLOST`, e.g. USB cable unplugged) the plugin reported a power cut, a false critical alert with the leak/smoke sensor types. It now shows the UPS as "No Response". "On battery" is read from apcupsd's on-battery flag.
 - Polling interval is clamped to at least 1 second.
 - Model, serial number and firmware/software revision reported by the UPS now actually show up in HomeKit and the Homebridge UI (served through `onGet`, since Homebridge copies the required AccessoryInformation values only once at startup). The accessory name always comes from the `name` config option; the UPS name is only logged.
 - Tooling: ESLint 9 (flat config), Prettier 3, `node:test` unit tests; drop `prettier-eslint` and `eslint-config-airbnb-base`.
