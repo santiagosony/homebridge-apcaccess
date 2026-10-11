@@ -9,7 +9,7 @@ This accessory:
 - Is essentially a worse version of [homespun/homebridge-accessory-apcupsd](https://github.com/homespun/homebridge-accessory-apcupsd) which I was too dumb to get working.
 - Publishes a `Battery` service to show charging state / battery levels.
 - Publishes `ContactSensor` two subscribable events: `Contact State` and `Low Battery`, for your push alerting pleasure.
-- Optionally publishes a `TemperatureSensor` if you have a fancy UPS which reports this.
+- Optionally publishes a `TemperatureSensor` with the UPS internal temperature (apcupsd's `ITEMP`). Only Smart-UPS models report it; Back-UPS models don't.
 
 ## Requirements
 
@@ -37,7 +37,7 @@ The plugin will run with these default values, they can be changed in the `acces
 }
 ```
 
-`interval` is in seconds.
+`interval` is in seconds (minimum 1).
 
 Once connected, the model, serial number, firmware and apcupsd version reported by the UPS replace the `model`, `serial`, `firmwareRevision` and `softwareRevision` values; those options are only used as a fallback when the UPS doesn't report them. The accessory name always comes from `name`.
 

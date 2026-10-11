@@ -2,6 +2,7 @@
   "pluginAlias": "APCAccess",
   "pluginType": "accessory",
   "singular": false,
+  "headerDisplay": "Exposes a UPS managed by [apcupsd](http://www.apcupsd.org/) to HomeKit. apcupsd must have its Network Information Server enabled (`NETSERVER on` in `/etc/apcupsd/apcupsd.conf`).",
   "schema": {
     "type": "object",
     "properties": {
@@ -14,48 +15,84 @@
       "host": {
         "title": "apcupsd host",
         "type": "string",
-        "default": "localhost",
-        "description": "Host running apcupsd with its Network Information Server (NIS) enabled."
+        "placeholder": "localhost",
+        "description": "Hostname or IP of the machine running apcupsd. Leave empty if it runs on the Homebridge server."
       },
       "port": {
-        "title": "apcupsd NIS port",
+        "title": "apcupsd port",
         "type": "integer",
-        "default": 3551,
-        "minimum": 1,
-        "maximum": 65535
+        "placeholder": 3551,
+        "description": "Leave empty to use apcupsd's default NIS port (3551)."
+      },
+      "temperatureSensor": {
+        "title": "Expose a temperature sensor",
+        "type": "boolean",
+        "default": false,
+        "description": "Publishes the UPS internal temperature (apcupsd's ITEMP value). Only Smart-UPS models report it; Back-UPS and most consumer models don't, and would show 0 °C."
       },
       "interval": {
         "title": "Polling interval (seconds)",
-        "type": "number",
-        "default": 1,
-        "minimum": 1
-      },
-      "temperatureSensor": {
-        "title": "Expose temperature sensor",
-        "type": "boolean",
-        "default": false,
-        "description": "Only for UPS models that report ITEMP."
+        "type": "integer",
+        "placeholder": 1,
+        "minimum": 1,
+        "description": "How often the UPS status is read. Lower values detect power cuts sooner."
       },
       "errorLogsOnly": {
         "title": "Only log errors",
         "type": "boolean",
-        "default": false
+        "default": false,
+        "description": "Hide the informational log lines (power, battery and charging state changes)."
       },
       "manufacturer": {
         "title": "Manufacturer",
         "type": "string",
-        "default": "American Power Conversion"
+        "placeholder": "American Power Conversion"
       },
       "model": {
         "title": "Model",
         "type": "string",
-        "description": "Overwritten with the model reported by the UPS once connected."
+        "placeholder": "Reported by the UPS",
+        "description": "Only used if the UPS doesn't report it."
       },
       "serial": {
         "title": "Serial number",
         "type": "string",
-        "description": "Overwritten with the serial reported by the UPS once connected."
+        "placeholder": "Reported by the UPS",
+        "description": "Only used if the UPS doesn't report it."
+      },
+      "firmwareRevision": {
+        "title": "Firmware revision",
+        "type": "string",
+        "placeholder": "Reported by the UPS",
+        "description": "Only used if the UPS doesn't report it."
       }
     }
-  }
+  },
+  "layout": [
+    "name",
+    {
+      "type": "flex",
+      "flex-flow": "row wrap",
+      "items": [
+        { "key": "host", "flex": "3 3 200px" },
+        { "key": "port", "flex": "1 1 100px" }
+      ]
+    },
+    "temperatureSensor",
+    {
+      "type": "fieldset",
+      "title": "Advanced",
+      "expandable": true,
+      "expanded": false,
+      "items": ["interval", "errorLogsOnly"]
+    },
+    {
+      "type": "fieldset",
+      "title": "Accessory information",
+      "description": "Normally filled in automatically from what the UPS reports.",
+      "expandable": true,
+      "expanded": false,
+      "items": ["manufacturer", "model", "serial", "firmwareRevision"]
+    }
+  ]
 }

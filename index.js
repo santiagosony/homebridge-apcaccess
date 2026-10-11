@@ -122,7 +122,7 @@ class APCAccess {
       // Schedule the next poll only after this one finished, so requests never pile up
       this.pollTimer = setTimeout(
         this.poll.bind(this),
-        (Number(this.config.interval) || DEFAULT_INTERVAL) * SECOND,
+        Math.max(Number(this.config.interval) || DEFAULT_INTERVAL, 1) * SECOND,
       );
     }
   }
@@ -131,7 +131,7 @@ class APCAccess {
     try {
       this.latestJSON = await queryStatus({
         host: this.config.host || DEFAULT_HOST,
-        port: this.config.port || DEFAULT_PORT,
+        port: Number(this.config.port) || DEFAULT_PORT,
       });
 
       if (!this.connected) {
