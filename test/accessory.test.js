@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
+const net = require('node:net');
 const { startFakeApcupsd } = require('./fakeApcupsd');
 
 const STATUS = [
@@ -56,7 +57,7 @@ const createAccessory = async (t, { status = STATUS, ...config }) => {
     server.close();
   });
 
-  return { accessory, hap };
+  return { accessory, hap, api };
 };
 
 const waitForFirstPoll = async (accessory) => {
@@ -289,4 +290,28 @@ test('"replace battery" is reported as low battery, not as "not chargeable"', as
     Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW,
   );
   assert.equal(value(Characteristic.ChargingState), Characteristic.ChargingState.NOT_CHARGING);
+});
+
+test('shutdown cancels an in-flight poll and stops polling', async (t) => {
+  // apcupsd that accepts the connection but never answers
+  const sockets = new Set();
+  const silent = net.createServer((socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+    socket.resume(); // read, so the client closing the connection is noticed
+  });
+  await new Promise((resolve) => silent.listen(0, '127.0.0.1', resolve));
+  t.after(() => silent.close());
+
+  const { accessory, api } = await createAccessory(t, { port: silent.address().port });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(sockets.size, 1);
+
+  api.emit('shutdown');
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  // The request was cancelled right away instead of waiting for its 5 s timeout
+  assert.equal(sockets.size, 0);
+  assert.equal(accessory.pollTimer, undefined);
+  assert.equal(accessory.failedPolls, 0);
 });

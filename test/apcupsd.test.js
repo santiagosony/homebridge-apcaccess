@@ -45,3 +45,19 @@ test('queryStatus times out on a silent server', async (t) => {
     /Timed out/,
   );
 });
+
+test('queryStatus can be cancelled', async (t) => {
+  const server = net.createServer(() => {});
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+
+  const controller = new AbortController();
+  const request = queryStatus({
+    host: '127.0.0.1',
+    port: server.address().port,
+    signal: controller.signal,
+  });
+  setTimeout(() => controller.abort(), 50);
+
+  await assert.rejects(request, /cancelled/);
+});

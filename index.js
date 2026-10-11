@@ -69,6 +69,8 @@ class APCAccess {
     this.connected = false;
     this.failedPolls = 0;
     this.pollTimer = undefined;
+    // Cancels the in-flight apcupsd request and stops polling when Homebridge shuts down
+    this.shutdown = new AbortController();
 
     this.state = Object.seal({
       onBattery: undefined,
@@ -158,11 +160,14 @@ class APCAccess {
     this.poll();
 
     if (api) {
-      api.on('shutdown', () => {
-        clearTimeout(this.pollTimer);
-        this.pollTimer = undefined;
-      });
+      api.on('shutdown', () => this.stop());
     }
+  }
+
+  stop() {
+    this.shutdown.abort();
+    clearTimeout(this.pollTimer);
+    this.pollTimer = undefined;
   }
 
   // Wraps an onGet handler so HomeKit shows "No Response" while apcupsd can't be reached,
@@ -213,10 +218,12 @@ class APCAccess {
       this.log.error('Unexpected error while polling the UPS:', err);
     } finally {
       // Schedule the next poll only after this one finished, so requests never pile up
-      this.pollTimer = setTimeout(
-        this.poll.bind(this),
-        Math.max(Number(this.config.interval) || DEFAULT_INTERVAL, 1) * SECOND,
-      );
+      if (!this.shutdown.signal.aborted) {
+        this.pollTimer = setTimeout(
+          this.poll.bind(this),
+          Math.max(Number(this.config.interval) || DEFAULT_INTERVAL, 1) * SECOND,
+        );
+      }
     }
   }
 
@@ -225,6 +232,7 @@ class APCAccess {
       const status = await queryStatus({
         host: this.config.host || DEFAULT_HOST,
         port: Number(this.config.port) || DEFAULT_PORT,
+        signal: this.shutdown.signal,
       });
 
       // apcupsd still answers when it can't talk to the UPS (e.g. USB cable unplugged), but the
@@ -244,6 +252,7 @@ class APCAccess {
       if (!this.loaded) this.firstRun();
       this.doPolledChecks();
     } catch (err) {
+      if (this.shutdown.signal.aborted) return;
       this.failedPolls += 1;
 
       if (this.connected && this.failedPolls >= MAX_FAILED_POLLS) {
@@ -313,10 +322,10 @@ class APCAccess {
 
   parseLowBatteryValue = () => (this.isLowBattery() ? 'BATTERY_LEVEL_LOW' : 'BATTERY_LEVEL_NORMAL');
 
-  // Low when the UPS says so, or when below the optional thresholds from the config
   // The UPS asks for a new battery; there's no HomeKit field for it, so it's reported as low battery
   needsNewBattery = () => Boolean(this.parseStatFlag() & UPS_REPLACE_BATT);
 
+  // Low when the UPS says so, or when below the optional thresholds from the config
   isLowBattery = () => {
     if (this.parseStatFlag() & UPS_BATT_LOW) return true;
     if (this.needsNewBattery()) return true;
