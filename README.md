@@ -10,6 +10,7 @@ This accessory:
 - Publishes a `Battery` service to show charging state / battery levels.
 - Publishes `ContactSensor` two subscribable events: `Contact State` and `Low Battery`, for your push alerting pleasure.
 - Optionally publishes a `TemperatureSensor` with the UPS internal temperature (apcupsd's `ITEMP`). Only Smart-UPS models report it; Back-UPS models don't.
+- Optionally publishes the UPS load (apcupsd's `LOADPCT`, % of rated power in use) as a `HumiditySensor` named `<name> Load`, since HomeKit has no load sensor type.
 
 ## Requirements
 
@@ -33,6 +34,7 @@ The plugin will run with these default values, they can be changed in the `acces
     "serial": "unknown",
     "interval": 1,
     "temperatureSensor": false,
+    "loadSensor": false,
     "errorLogsOnly": false
 }
 ```

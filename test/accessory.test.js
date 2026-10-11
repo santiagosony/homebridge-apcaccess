@@ -14,6 +14,7 @@ const STATUS = [
   'TIMELEFT : 12.5 Minutes',
   'BATTV    : 13.2 Volts',
   'ITEMP    : 29.2 C',
+  'LOADPCT  : 23.0 Percent',
 ];
 
 const silentLog = () => {
@@ -48,6 +49,7 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
       port: server.address().port,
       interval: 60,
       temperatureSensor: true,
+      loadSensor: true,
     },
     api,
   );
@@ -57,7 +59,7 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
   });
 
   const services = accessory.getServices();
-  assert.equal(services.length, 4);
+  assert.equal(services.length, 5);
   assert.ok(services.some((service) => service instanceof Service.Battery));
 
   // Mimic Homebridge: it copies the plugin's AccessoryInformation into the accessory's own service
@@ -88,6 +90,8 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
   assert.ok(
     Math.abs(value(accessory.temperatureService, Characteristic.CurrentTemperature) - 29.2) < 0.01,
   );
+  assert.equal(value(accessory.loadService, Characteristic.CurrentRelativeHumidity), 23);
+  assert.equal(value(accessory.loadService, Characteristic.ConfiguredName), 'UPS Load');
   assert.equal(value(accessory.informationService, Characteristic.SerialNumber), '3B1234X56789');
 
   // Values reported by the UPS reach the service HomeKit actually reads

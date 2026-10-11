@@ -93,6 +93,18 @@ class APCAccess {
         .onGet(() => this.getTemperature());
     }
 
+    if (this.config.loadSensor) {
+      // HomeKit has no "load" sensor; a humidity sensor is the closest built-in 0-100 % reading
+      const loadName = `${name} Load`;
+      this.loadService = new Service.HumiditySensor(loadName, 'load');
+      if (Characteristic.ConfiguredName) {
+        this.loadService.setCharacteristic(Characteristic.ConfiguredName, loadName);
+      }
+      this.loadService
+        .getCharacteristic(Characteristic.CurrentRelativeHumidity)
+        .onGet(() => this.getLoad());
+    }
+
     // Only start polling once all services exist
     this.poll();
 
@@ -110,6 +122,10 @@ class APCAccess {
 
     if (this.temperatureService) {
       services.push(this.temperatureService);
+    }
+
+    if (this.loadService) {
+      services.push(this.loadService);
     }
 
     return services;
@@ -268,6 +284,25 @@ class APCAccess {
     }
   }
 
+  getLoad() {
+    // LOADPCT, e.g. "23.0 Percent"
+    const load = parseFloat(this.latestJSON.LOADPCT);
+
+    if (Number.isNaN(load)) {
+      if (this.loaded) this.log.update.error('Unable to determine Load');
+      return 0;
+    }
+
+    this.log.update.info('Load:', `${load}%`);
+    return Math.min(Math.max(load, 0), 100);
+  }
+
+  checkLoad() {
+    if (!this.loadService) return;
+
+    this.loadService.updateCharacteristic(Characteristic.CurrentRelativeHumidity, this.getLoad());
+  }
+
   checkTemperature() {
     if (!this.temperatureService) return;
 
@@ -283,6 +318,7 @@ class APCAccess {
     this.checkCharging();
     this.checkBatteryLevel();
     this.checkTemperature();
+    this.checkLoad();
   }
 }
 

@@ -30,6 +30,12 @@
         "default": false,
         "description": "Publishes the UPS internal temperature (apcupsd's ITEMP value). Only Smart-UPS models report it; Back-UPS and most consumer models don't, and would show 0 °C."
       },
+      "loadSensor": {
+        "title": "Expose a load sensor",
+        "type": "boolean",
+        "default": false,
+        "description": "Publishes the UPS load (apcupsd's LOADPCT value, % of its rated power in use). HomeKit has no load sensor type, so it shows up as a humidity sensor named \"<Name> Load\"."
+      },
       "interval": {
         "title": "Polling interval (seconds)",
         "type": "integer",
@@ -74,17 +80,27 @@
       "type": "flex",
       "flex-flow": "row wrap",
       "items": [
-        { "key": "host", "flex": "3 3 200px" },
-        { "key": "port", "flex": "1 1 100px" }
+        {
+          "key": "host",
+          "flex": "3 3 200px"
+        },
+        {
+          "key": "port",
+          "flex": "1 1 100px"
+        }
       ]
     },
     "temperatureSensor",
+    "loadSensor",
     {
       "type": "fieldset",
       "title": "Advanced",
       "expandable": true,
       "expanded": false,
-      "items": ["interval", "errorLogsOnly"]
+      "items": [
+        "interval",
+        "errorLogsOnly"
+      ]
     },
     {
       "type": "fieldset",
@@ -92,7 +108,12 @@
       "description": "Normally filled in automatically from what the UPS reports.",
       "expandable": true,
       "expanded": false,
-      "items": ["manufacturer", "model", "serial", "firmwareRevision"]
+      "items": [
+        "manufacturer",
+        "model",
+        "serial",
+        "firmwareRevision"
+      ]
     }
   ]
 }
