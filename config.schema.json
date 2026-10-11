@@ -104,6 +104,22 @@
         "default": false,
         "description": "Hide the informational log lines (power, battery and charging state changes)."
       },
+      "logVoltage": {
+        "title": "Log line voltage changes",
+        "type": "boolean",
+        "default": false,
+        "description": "Write the input line voltage (LINEV) to the log when it changes. Works with or without the voltage sensor."
+      },
+      "voltageLogThreshold": {
+        "title": "Minimum voltage change to log (%)",
+        "type": "number",
+        "minimum": 0,
+        "placeholder": 5,
+        "condition": {
+          "functionBody": "return model.logVoltage === true;"
+        },
+        "description": "Only log when the voltage moved at least this much since the last logged value. 0 logs every change."
+      },
       "model": {
         "title": "Model",
         "type": "string",
@@ -163,7 +179,9 @@
       "expanded": false,
       "items": [
         "interval",
-        "errorLogsOnly"
+        "errorLogsOnly",
+        "logVoltage",
+        "voltageLogThreshold"
       ]
     },
     {

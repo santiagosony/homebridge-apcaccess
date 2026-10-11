@@ -51,7 +51,9 @@ Configure it from the Homebridge UI, or add an accessory to `config.json`. Every
       "lowBatteryLevel": 0,
       "lowBatteryMinutes": 0,
       "interval": 1,
-      "errorLogsOnly": false
+      "errorLogsOnly": false,
+      "logVoltage": false,
+      "voltageLogThreshold": 5
     }
   ]
 }
@@ -68,6 +70,8 @@ Configure it from the Homebridge UI, or add an accessory to `config.json`. Every
 | `lowBatteryMinutes`                                | While on battery, also report low battery at or below this many minutes of runtime left. `0` disables it. |
 | `interval`                                         | Polling interval in seconds (minimum 1).                                                                  |
 | `errorLogsOnly`                                    | Only log errors and warnings.                                                                             |
+| `logVoltage`                                       | Log the line voltage when it changes (with or without the voltage sensor).                                |
+| `voltageLogThreshold`                              | Only log the voltage when it moved at least this % since the last logged value. `0` logs every change.    |
 | `model`, `serial`, `firmwareRevision`              | Only used if the UPS doesn't report them.                                                                 |
 
 ## Development

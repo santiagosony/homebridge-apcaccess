@@ -16,6 +16,8 @@ const FULLY_CHARGED = 100;
 const MAX_FAILED_POLLS = 3;
 const SECOND = 1000;
 const MIN_LIGHT_LEVEL = 0.0001;
+// Default minimum change, in %, before the line voltage is logged again
+const DEFAULT_VOLTAGE_LOG_THRESHOLD = 5;
 const UNKNOWN = 'unknown';
 
 // AccessoryInformation characteristic -> apcupsd key / config option / default
@@ -438,18 +440,44 @@ class APCAccess {
       return MIN_LIGHT_LEVEL;
     }
 
-    this.log.update.info('Line voltage:', `${voltage} V`);
     // CurrentAmbientLightLevel can't go below 0.0001
     return Math.max(voltage, MIN_LIGHT_LEVEL);
   }
 
   checkVoltage() {
+    this.logVoltage();
     if (!this.voltageService) return;
 
     this.voltageService.updateCharacteristic(
       Characteristic.CurrentAmbientLightLevel,
       this.getVoltage(),
     );
+  }
+
+  // Optional (`logVoltage`), and only when the voltage moved at least `voltageLogThreshold` %
+  // since the last logged value, so small fluctuations (e.g. 220 <-> 222 V) don't flood the log
+  logVoltage() {
+    if (!this.config.logVoltage) return;
+
+    const voltage = parseFloat(this.latestJSON.LINEV);
+    if (Number.isNaN(voltage)) return;
+
+    const configured = this.config.voltageLogThreshold;
+    const threshold =
+      configured === undefined || configured === '' || Number.isNaN(Number(configured))
+        ? DEFAULT_VOLTAGE_LOG_THRESHOLD
+        : Math.max(Number(configured), 0);
+
+    const last = this.lastLoggedVoltage;
+    const changed =
+      last === undefined ||
+      (last === 0
+        ? voltage !== 0
+        : voltage !== last && (Math.abs(voltage - last) / last) * 100 >= threshold);
+    if (!changed) return;
+
+    this.log.info('Line voltage:', `${voltage} V`);
+    this.lastLoggedVoltage = voltage;
   }
 
   checkTemperature() {

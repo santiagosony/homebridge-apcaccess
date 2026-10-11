@@ -32,7 +32,7 @@ const ON_BATTERY = STATUS.map((line) =>
   line.startsWith('STATFLAG') ? 'STATFLAG : 0x05000050' : line,
 );
 
-const createAccessory = async (t, { status = STATUS, ...config }) => {
+const createAccessory = async (t, { status = STATUS, log = silentLog(), ...config }) => {
   const { HAPLibraryVersion, ...hap } = await import('@homebridge/hap-nodejs');
   const server = await startFakeApcupsd(status);
 
@@ -48,7 +48,7 @@ const createAccessory = async (t, { status = STATUS, ...config }) => {
   t.diagnostic(`HAP-NodeJS ${HAPLibraryVersion()}`);
 
   const accessory = new Accessory(
-    silentLog(),
+    log,
     { name: 'UPS', host: '127.0.0.1', port: server.address().port, interval: 60, ...config },
     api,
   );
@@ -314,4 +314,44 @@ test('shutdown cancels an in-flight poll and stops polling', async (t) => {
   assert.equal(sockets.size, 0);
   assert.equal(accessory.pollTimer, undefined);
   assert.equal(accessory.failedPolls, 0);
+});
+
+const voltageLogLines = async (t, config, voltages) => {
+  const lines = [];
+  const log = silentLog();
+  log.info = (...args) => {
+    if (args[0] === 'Line voltage:') lines.push(args[1]);
+  };
+
+  const { accessory } = await createAccessory(t, { log, ...config });
+  await waitForFirstPoll(accessory);
+
+  voltages.forEach((voltage) => {
+    accessory.latestJSON = { ...accessory.latestJSON, LINEV: `${voltage} Volts` };
+    accessory.checkVoltage();
+  });
+  return lines;
+};
+
+test('line voltage is not logged by default', async (t) => {
+  assert.deepEqual(await voltageLogLines(t, { voltageSensor: true }, [220, 200, 0]), []);
+});
+
+test('line voltage is logged only past the threshold (5 % by default)', async (t) => {
+  // First poll logs 222 V; 220 (-0.9 %) and 215 (-3.2 %) are skipped; 210 (-5.4 %) and 0 are logged
+  const lines = await voltageLogLines(
+    t,
+    { logVoltage: true },
+    [220, 222, 215, 210, 211, 0, 0, 222],
+  );
+  assert.deepEqual(lines, ['222 V', '210 V', '0 V', '222 V']);
+});
+
+test('a voltage log threshold of 0 logs every change', async (t) => {
+  const lines = await voltageLogLines(
+    t,
+    { logVoltage: true, voltageLogThreshold: 0 },
+    [220, 220, 222],
+  );
+  assert.deepEqual(lines, ['222 V', '220 V', '222 V']);
 });
