@@ -37,11 +37,15 @@ The plugin will run with these default values, they can be changed in the `acces
     "powerSensorType": "contact",
     "temperatureSensor": false,
     "loadSensor": false,
+    "lowBatteryLevel": 0,
+    "lowBatteryMinutes": 0,
     "errorLogsOnly": false
 }
 ```
 
 `interval` is in seconds (minimum 1).
+
+Low battery is reported when the UPS itself flags it. `lowBatteryLevel` (%) and `lowBatteryMinutes` (estimated runtime left, only checked while on battery) can trigger it earlier; `0` disables them.
 
 Once connected, the model, serial number, firmware and apcupsd version reported by the UPS replace the `model`, `serial`, `firmwareRevision` and `softwareRevision` values; those options are only used as a fallback when the UPS doesn't report them. The accessory name always comes from `name`.
 

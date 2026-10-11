@@ -285,8 +285,21 @@ class APCAccess {
 
   isOnBattery = () => !(this.parseStatFlag() & UPS_ACTIVE);
 
-  parseLowBatteryValue = () =>
-    this.parseStatFlag() & UPS_BATT_LOW ? 'BATTERY_LEVEL_LOW' : 'BATTERY_LEVEL_NORMAL';
+  parseLowBatteryValue = () => (this.isLowBattery() ? 'BATTERY_LEVEL_LOW' : 'BATTERY_LEVEL_NORMAL');
+
+  // Low when the UPS says so, or when below the optional thresholds from the config
+  isLowBattery = () => {
+    if (this.parseStatFlag() & UPS_BATT_LOW) return true;
+    if (!this.loaded) return false;
+
+    const level = Number(this.config.lowBatteryLevel);
+    if (level > 0 && this.parseBatteryLevel() <= level) return true;
+
+    // On mains TIMELEFT is the runtime a full battery would give, so only check it on battery
+    const minutes = Number(this.config.lowBatteryMinutes);
+    const timeLeft = parseFloat(this.latestJSON.TIMELEFT);
+    return minutes > 0 && this.isOnBattery() && timeLeft <= minutes;
+  };
 
   parseChargingState = () =>
     this.parseStatFlag() & UPS_NOT_CHARGEABLE

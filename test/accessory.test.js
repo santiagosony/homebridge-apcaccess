@@ -183,3 +183,41 @@ test('only gives up on apcupsd after several failed polls in a row', async (t) =
   assert.equal(accessory.connected, false);
   assert.equal(accessory.state.batteryLevel, undefined);
 });
+
+// Charge 42 %, 12.5 minutes left, UPS low battery flag not set
+const NOT_LOW = STATUS.map((line) =>
+  line.startsWith('STATFLAG') ? 'STATFLAG : 0x05000008' : line,
+);
+const NOT_LOW_ON_BATTERY = STATUS.map((line) =>
+  line.startsWith('STATFLAG') ? 'STATFLAG : 0x05000010' : line,
+);
+
+for (const [description, status, config, expected] of [
+  ['no thresholds', NOT_LOW, {}, 'BATTERY_LEVEL_NORMAL'],
+  ['charge below lowBatteryLevel', NOT_LOW, { lowBatteryLevel: 50 }, 'BATTERY_LEVEL_LOW'],
+  ['charge above lowBatteryLevel', NOT_LOW, { lowBatteryLevel: 30 }, 'BATTERY_LEVEL_NORMAL'],
+  [
+    'runtime below lowBatteryMinutes on battery',
+    NOT_LOW_ON_BATTERY,
+    { lowBatteryMinutes: 15 },
+    'BATTERY_LEVEL_LOW',
+  ],
+  [
+    'runtime below lowBatteryMinutes on mains',
+    NOT_LOW,
+    { lowBatteryMinutes: 15 },
+    'BATTERY_LEVEL_NORMAL',
+  ],
+  ['UPS low battery flag', STATUS, {}, 'BATTERY_LEVEL_LOW'],
+]) {
+  test(`low battery: ${description}`, async (t) => {
+    const { accessory, hap } = await createAccessory(t, { status, ...config });
+    const { Characteristic } = hap;
+    await waitForFirstPoll(accessory);
+
+    assert.equal(
+      accessory.batteryService.getCharacteristic(Characteristic.StatusLowBattery).value,
+      Characteristic.StatusLowBattery[expected],
+    );
+  });
+}

@@ -71,6 +71,20 @@
         "default": false,
         "description": "Publishes the UPS load (apcupsd's LOADPCT value, % of its rated power in use). HomeKit has no load sensor type, so it shows up as a humidity sensor named \"<Name> Load\"."
       },
+      "lowBatteryLevel": {
+        "title": "Low battery below (%)",
+        "type": "integer",
+        "minimum": 0,
+        "placeholder": "Use the UPS warning only",
+        "description": "Report low battery when the charge is at or below this percentage."
+      },
+      "lowBatteryMinutes": {
+        "title": "Low battery below (minutes of runtime)",
+        "type": "integer",
+        "minimum": 0,
+        "placeholder": "Use the UPS warning only",
+        "description": "While running on battery, report low battery when the estimated runtime left is at or below this many minutes."
+      },
       "interval": {
         "title": "Polling interval (seconds)",
         "type": "integer",
@@ -129,6 +143,17 @@
     "powerSensorType",
     "temperatureSensor",
     "loadSensor",
+    {
+      "type": "fieldset",
+      "title": "Low battery alert",
+      "description": "The UPS's own low battery warning is always used. Optionally, also report low battery earlier:",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "lowBatteryLevel",
+        "lowBatteryMinutes"
+      ]
+    },
     {
       "type": "fieldset",
       "title": "Advanced",
