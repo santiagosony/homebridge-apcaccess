@@ -7,6 +7,7 @@
 - Polling no longer overlaps (next poll is scheduled after the previous one finishes) and starts only after all services exist; it stops on Homebridge shutdown.
 - Temperature sensor value is now pushed to HomeKit on every poll and keeps decimals.
 - Add `config.schema.json` for the Homebridge UI.
+- Model, serial number and firmware/software revision reported by the UPS now actually show up in HomeKit and the Homebridge UI (served through `onGet`, since Homebridge copies the required AccessoryInformation values only once at startup). The accessory name always comes from the `name` config option; the UPS name is only logged.
 - Tooling: ESLint 9 (flat config), Prettier 3, `node:test` unit tests; drop `prettier-eslint` and `eslint-config-airbnb-base`.
 
 # [1.0.3]

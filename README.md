@@ -39,6 +39,8 @@ The plugin will run with these default values, they can be changed in the `acces
 
 `interval` is in seconds.
 
+Once connected, the model, serial number, firmware and apcupsd version reported by the UPS replace the `model`, `serial`, `firmwareRevision` and `softwareRevision` values; those options are only used as a fallback when the UPS doesn't report them. The accessory name always comes from `name`.
+
 The plugin also ships a `config.schema.json`, so it can be configured from the Homebridge UI.
 
 ## Development

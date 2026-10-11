@@ -15,6 +15,14 @@ const FULLY_CHARGED = 100;
 const SECOND = 1000;
 const UNKNOWN = 'unknown';
 
+// AccessoryInformation characteristic -> apcupsd key / config option / default
+const DEVICE_INFO = {
+  Model: { key: 'MODEL', config: 'model', fallback: DEFAULT_MODEL },
+  SerialNumber: { key: 'SERIALNO', config: 'serial', fallback: UNKNOWN },
+  FirmwareRevision: { key: 'FIRMWARE', config: 'firmwareRevision', fallback: UNKNOWN },
+  SoftwareRevision: { key: 'VERSION', config: 'softwareRevision', fallback: UNKNOWN },
+};
+
 const UPS_ACTIVE = 0x08;
 const UPS_BATT_LOW = 0x40;
 const UPS_NOT_CHARGEABLE = 0x80;
@@ -47,11 +55,18 @@ class APCAccess {
         Characteristic.Manufacturer,
         this.config.manufacturer || DEFAULT_MANUFACTURER,
       )
-      .setCharacteristic(Characteristic.Model, this.config.model || DEFAULT_MODEL)
-      .setCharacteristic(Characteristic.Name, name)
-      .setCharacteristic(Characteristic.SerialNumber, this.config.serial || UNKNOWN)
-      .setCharacteristic(Characteristic.FirmwareRevision, this.config.firmwareRevision || UNKNOWN)
-      .setCharacteristic(Characteristic.SoftwareRevision, this.config.softwareRevision || UNKNOWN);
+      .setCharacteristic(Characteristic.Name, name);
+
+    // Homebridge copies the required AccessoryInformation characteristics into its own
+    // service once, at startup, so later updateCharacteristic() calls never reach HomeKit.
+    // It does copy onGet handlers though, so serve the UPS-reported values through them.
+    Object.entries(DEVICE_INFO).forEach(([characteristic, { key, config, fallback }]) => {
+      const getValue = () => this.getDeviceInfo(key, this.config[config] || fallback);
+      this.informationService
+        .getCharacteristic(Characteristic[characteristic])
+        .updateValue(getValue())
+        .onGet(getValue);
+    });
 
     this.contactSensor = new Service.ContactSensor(name);
     this.contactSensor
@@ -142,21 +157,20 @@ class APCAccess {
   }
 
   setDeviceInfo() {
-    // Property names match HK API
-    const deviceInfo = {
-      Model: 'MODEL',
-      Name: 'UPSNAME',
-      SerialNumber: 'SERIALNO',
-      SoftwareRevision: 'VERSION',
-      FirmwareRevision: 'FIRMWARE',
-    };
+    this.log.info('UPS name:', this.parseData('UPSNAME'));
 
-    Object.entries(deviceInfo).forEach(([key, value]) => {
-      const info = this.parseData(value);
-      this.log.info(`${key}:`, info);
-      this.informationService.updateCharacteristic(Characteristic[key], info);
+    Object.entries(DEVICE_INFO).forEach(([characteristic, { key, config, fallback }]) => {
+      const info = this.getDeviceInfo(key, this.config[config] || fallback);
+      this.log.info(`${characteristic}:`, info);
+      this.informationService.updateCharacteristic(Characteristic[characteristic], info);
     });
   }
+
+  // Prefer what the UPS reports, then the user's config, then a default
+  getDeviceInfo = (key, fallback) => {
+    const value = this.parseData(key);
+    return value === UNKNOWN ? fallback : value;
+  };
 
   getTemperature() {
     // ITEMP, e.g. "29.2 C"

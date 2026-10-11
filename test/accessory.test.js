@@ -60,6 +60,10 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
   assert.equal(services.length, 4);
   assert.ok(services.some((service) => service instanceof Service.Battery));
 
+  // Mimic Homebridge: it copies the plugin's AccessoryInformation into the accessory's own service
+  const bridgedInfo = new Service.AccessoryInformation();
+  bridgedInfo.replaceCharacteristicsFromService(accessory.informationService);
+
   // Wait for the first poll to land
   for (let i = 0; i < 50 && !accessory.loaded; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -85,6 +89,14 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
     Math.abs(value(accessory.temperatureService, Characteristic.CurrentTemperature) - 29.2) < 0.01,
   );
   assert.equal(value(accessory.informationService, Characteristic.SerialNumber), '3B1234X56789');
+
+  // Values reported by the UPS reach the service HomeKit actually reads
+  const read = (characteristic) => bridgedInfo.getCharacteristic(characteristic).handleGetRequest();
+  assert.equal(await read(Characteristic.SerialNumber), '3B1234X56789');
+  assert.equal(await read(Characteristic.Model), 'Back-UPS XS 700U');
+  assert.equal(await read(Characteristic.FirmwareRevision), '924.Z3 .I USB FW:Z3');
+  assert.equal(await read(Characteristic.SoftwareRevision), '3.14.14 (31 May 2016) debian');
+  assert.equal(await read(Characteristic.Name), 'UPS');
 
   // onGet handlers answer HomeKit reads
   assert.equal(
