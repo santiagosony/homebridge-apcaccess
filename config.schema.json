@@ -1,0 +1,207 @@
+{
+  "pluginAlias": "APCAccess",
+  "pluginType": "accessory",
+  "singular": false,
+  "headerDisplay": "Exposes a UPS managed by [apcupsd](http://www.apcupsd.org/) to HomeKit. apcupsd must have its Network Information Server enabled (`NETSERVER on` in `/etc/apcupsd/apcupsd.conf`).",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "APC UPS",
+        "required": true,
+        "description": "Accessory name. The sensors are named after it, e.g. \"APC UPS Power\" and \"APC UPS Charge\"."
+      },
+      "host": {
+        "title": "apcupsd host",
+        "type": "string",
+        "placeholder": "localhost",
+        "description": "Hostname or IP of the machine running apcupsd. Leave empty if it runs on the Homebridge server."
+      },
+      "port": {
+        "title": "apcupsd port",
+        "type": "integer",
+        "placeholder": 3551,
+        "description": "Leave empty to use apcupsd's default NIS port (3551)."
+      },
+      "contactSensor": {
+        "title": "Expose a mains power sensor",
+        "type": "boolean",
+        "default": true,
+        "description": "Shown as \"<Name> Power\". Triggered while the UPS is running on battery, idle while mains power is connected. Turn off if you only want the battery status."
+      },
+      "powerSensorType": {
+        "title": "Mains power sensor type",
+        "type": "string",
+        "default": "contact",
+        "oneOf": [
+          {
+            "title": "Contact sensor (open on power cut)",
+            "enum": [
+              "contact"
+            ]
+          },
+          {
+            "title": "Leak sensor (critical alert on power cut)",
+            "enum": [
+              "leak"
+            ]
+          },
+          {
+            "title": "Smoke sensor (critical alert on power cut)",
+            "enum": [
+              "smoke"
+            ]
+          }
+        ],
+        "condition": {
+          "functionBody": "return model.contactSensor !== false;"
+        },
+        "description": "Leak and smoke alerts are HomeKit critical alerts: they show up even in Do Not Disturb or Focus, as long as Critical Alerts are allowed for the Home app in the iPhone's notification settings. The Home app will word the power cut as a leak or smoke alarm."
+      },
+      "temperatureSensor": {
+        "title": "Expose a temperature sensor",
+        "type": "boolean",
+        "default": false,
+        "description": "Shown as \"<Name> Temperature\", with the UPS internal temperature (apcupsd's ITEMP value). Only Smart-UPS models report it; Back-UPS and most consumer models don't, and would show 0 °C."
+      },
+      "loadSensor": {
+        "title": "Expose a load sensor",
+        "type": "boolean",
+        "default": false,
+        "description": "Shown as \"<Name> Load\", with the UPS load (apcupsd's LOADPCT value, % of its rated power in use). HomeKit has no load sensor type, so it is a light sensor: 23 lux means 23 %."
+      },
+      "voltageSensor": {
+        "title": "Expose a line voltage sensor",
+        "type": "boolean",
+        "default": false,
+        "description": "Shown as \"<Name> Voltage\", with the input line voltage (apcupsd's LINEV value). HomeKit has no voltage sensor type, so it is a light sensor: 222 lux means 222 V."
+      },
+      "lowBatteryLevel": {
+        "title": "Low battery at or below (%)",
+        "type": "integer",
+        "minimum": 0,
+        "placeholder": "Off",
+        "description": "Also report low battery when the charge is at or below this percentage. Leave empty or 0 to turn off."
+      },
+      "lowBatteryMinutes": {
+        "title": "Low battery at or below (minutes of runtime left)",
+        "type": "integer",
+        "minimum": 0,
+        "placeholder": "Off",
+        "description": "While running on battery, also report low battery when the estimated runtime left is at or below this many minutes. Leave empty or 0 to turn off."
+      },
+      "interval": {
+        "title": "Polling interval (seconds)",
+        "type": "integer",
+        "placeholder": 1,
+        "minimum": 1,
+        "description": "How often the UPS status is read (minimum 1). Lower values detect power cuts sooner."
+      },
+      "errorLogsOnly": {
+        "title": "Only log errors and warnings",
+        "type": "boolean",
+        "default": false,
+        "description": "Hide the informational log lines (connection, power, battery and charging state, line voltage)."
+      },
+      "logVoltage": {
+        "title": "Log line voltage changes",
+        "type": "boolean",
+        "default": false,
+        "description": "Write the input line voltage (LINEV) to the log when it changes. Works with or without the voltage sensor. Ignored when \"Only log errors and warnings\" is on."
+      },
+      "voltageLogThreshold": {
+        "title": "Minimum voltage change to log (%)",
+        "type": "number",
+        "minimum": 0,
+        "placeholder": 5,
+        "condition": {
+          "functionBody": "return model.logVoltage === true;"
+        },
+        "description": "Only log when the voltage moved at least this much since the last logged value. Leave empty for 5 %, or 0 to log every change."
+      },
+      "model": {
+        "title": "Model",
+        "type": "string",
+        "placeholder": "Reported by the UPS",
+        "description": "Only used if the UPS doesn't report it."
+      },
+      "serial": {
+        "title": "Serial number",
+        "type": "string",
+        "placeholder": "Reported by the UPS",
+        "description": "Only used if the UPS doesn't report it."
+      },
+      "firmwareRevision": {
+        "title": "Firmware revision",
+        "type": "string",
+        "placeholder": "Reported by the UPS",
+        "description": "Only used if the UPS doesn't report it."
+      }
+    }
+  },
+  "layout": [
+    "name",
+    {
+      "type": "flex",
+      "flex-flow": "row wrap",
+      "items": [
+        {
+          "key": "host",
+          "flex": "3 3 200px"
+        },
+        {
+          "key": "port",
+          "flex": "1 1 100px"
+        }
+      ]
+    },
+    "contactSensor",
+    "powerSensorType",
+    "temperatureSensor",
+    "loadSensor",
+    "voltageSensor",
+    {
+      "type": "fieldset",
+      "title": "Low battery alert",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        {
+          "type": "help",
+          "helpvalue": "<p class=\"help-block\">The UPS's own low battery warning, and its \"replace battery\" warning, are always used. Optionally, also report low battery earlier:</p>"
+        },
+        "lowBatteryLevel",
+        "lowBatteryMinutes"
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Advanced",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "interval",
+        "errorLogsOnly",
+        "logVoltage",
+        "voltageLogThreshold"
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Accessory information",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        {
+          "type": "help",
+          "helpvalue": "<p class=\"help-block\">Normally filled in automatically from what the UPS reports.</p>"
+        },
+        "model",
+        "serial",
+        "firmwareRevision"
+      ]
+    }
+  ]
+}
