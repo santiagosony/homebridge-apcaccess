@@ -15,6 +15,7 @@ const STATUS = [
   'BATTV    : 13.2 Volts',
   'ITEMP    : 29.2 C',
   'LOADPCT  : 23.0 Percent',
+  'LINEV    : 222.0 Volts',
 ];
 
 const silentLog = () => {
@@ -221,3 +222,28 @@ for (const [description, status, config, expected] of [
     );
   });
 }
+
+test('the line voltage sensor reports LINEV', async (t) => {
+  const { accessory, hap } = await createAccessory(t, { voltageSensor: true });
+  const { Characteristic, Service } = hap;
+  await waitForFirstPoll(accessory);
+
+  assert.ok(accessory.voltageService instanceof Service.LightSensor);
+  assert.ok(accessory.getServices().includes(accessory.voltageService));
+  const value = (characteristic) =>
+    accessory.voltageService.getCharacteristic(characteristic).value;
+  assert.equal(value(Characteristic.CurrentAmbientLightLevel), 222);
+  assert.equal(value(Characteristic.ConfiguredName), 'UPS Voltage');
+});
+
+test('the line voltage sensor handles a power cut (0 V)', async (t) => {
+  const status = STATUS.map((line) => (line.startsWith('LINEV') ? 'LINEV    : 0.0 Volts' : line));
+  const { accessory, hap } = await createAccessory(t, { voltageSensor: true, status });
+  await waitForFirstPoll(accessory);
+
+  const { Characteristic } = hap;
+  assert.equal(
+    accessory.voltageService.getCharacteristic(Characteristic.CurrentAmbientLightLevel).value,
+    0.0001,
+  );
+});

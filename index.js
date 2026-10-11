@@ -15,6 +15,7 @@ const FULLY_CHARGED = 100;
 // Consecutive failed polls before HomeKit shows the UPS as "No Response"
 const MAX_FAILED_POLLS = 3;
 const SECOND = 1000;
+const MIN_LIGHT_LEVEL = 0.0001;
 const UNKNOWN = 'unknown';
 
 // AccessoryInformation characteristic -> apcupsd key / config option / default
@@ -137,6 +138,16 @@ class APCAccess {
         .onGet(this.whenConnected(() => this.getLoad()));
     }
 
+    if (this.config.voltageSensor) {
+      // HomeKit has no voltage sensor; a light sensor accepts any positive reading (shown as lux)
+      this.voltageService = this.withConfiguredName(
+        new Service.LightSensor(`${name} Voltage`, 'voltage'),
+      );
+      this.voltageService
+        .getCharacteristic(Characteristic.CurrentAmbientLightLevel)
+        .onGet(this.whenConnected(() => this.getVoltage()));
+    }
+
     // Only start polling once all services exist
     this.poll();
 
@@ -179,6 +190,10 @@ class APCAccess {
 
     if (this.loadService) {
       services.push(this.loadService);
+    }
+
+    if (this.voltageService) {
+      services.push(this.voltageService);
     }
 
     return services;
@@ -390,6 +405,29 @@ class APCAccess {
     this.loadService.updateCharacteristic(Characteristic.CurrentRelativeHumidity, this.getLoad());
   }
 
+  getVoltage() {
+    // LINEV, e.g. "222.0 Volts"; 0 during a power cut
+    const voltage = parseFloat(this.latestJSON.LINEV);
+
+    if (Number.isNaN(voltage)) {
+      if (this.loaded) this.log.update.error('Unable to determine Line voltage');
+      return MIN_LIGHT_LEVEL;
+    }
+
+    this.log.update.info('Line voltage:', `${voltage} V`);
+    // CurrentAmbientLightLevel can't go below 0.0001
+    return Math.max(voltage, MIN_LIGHT_LEVEL);
+  }
+
+  checkVoltage() {
+    if (!this.voltageService) return;
+
+    this.voltageService.updateCharacteristic(
+      Characteristic.CurrentAmbientLightLevel,
+      this.getVoltage(),
+    );
+  }
+
   checkTemperature() {
     if (!this.temperatureService) return;
 
@@ -406,6 +444,7 @@ class APCAccess {
     this.checkBatteryLevel();
     this.checkTemperature();
     this.checkLoad();
+    this.checkVoltage();
   }
 }
 

@@ -71,6 +71,12 @@
         "default": false,
         "description": "Publishes the UPS load (apcupsd's LOADPCT value, % of its rated power in use). HomeKit has no load sensor type, so it shows up as a humidity sensor named \"<Name> Load\"."
       },
+      "voltageSensor": {
+        "title": "Expose a line voltage sensor",
+        "type": "boolean",
+        "default": false,
+        "description": "Publishes the input line voltage (apcupsd's LINEV value). HomeKit has no voltage sensor type, so it shows up as a light sensor named \"<Name> Voltage\": 222 lux means 222 V."
+      },
       "lowBatteryLevel": {
         "title": "Low battery below (%)",
         "type": "integer",
@@ -143,6 +149,7 @@
     "powerSensorType",
     "temperatureSensor",
     "loadSensor",
+    "voltageSensor",
     {
       "type": "fieldset",
       "title": "Low battery alert",
