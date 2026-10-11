@@ -164,10 +164,13 @@
     {
       "type": "fieldset",
       "title": "Low battery alert",
-      "description": "The UPS's own low battery warning is always used. Optionally, also report low battery earlier:",
       "expandable": true,
       "expanded": false,
       "items": [
+        {
+          "type": "help",
+          "helpvalue": "<p class=\"help-block\">The UPS's own low battery warning is always used. Optionally, also report low battery earlier:</p>"
+        },
         "lowBatteryLevel",
         "lowBatteryMinutes"
       ]
@@ -187,10 +190,13 @@
     {
       "type": "fieldset",
       "title": "Accessory information",
-      "description": "Normally filled in automatically from what the UPS reports.",
       "expandable": true,
       "expanded": false,
       "items": [
+        {
+          "type": "help",
+          "helpvalue": "<p class=\"help-block\">Normally filled in automatically from what the UPS reports.</p>"
+        },
         "model",
         "serial",
         "firmwareRevision"
