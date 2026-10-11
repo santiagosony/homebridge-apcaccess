@@ -1,29 +1,44 @@
 # [2.0.0]
 
-- Homebridge 2.x support (tested with v2.4.0), while keeping Homebridge 1.8+ working.
-  - Use `Service.Battery` (HAP-NodeJS 1.x/2.x removed `Service.BatteryService`, which caused `TypeError: Service.BatteryService is not a constructor`).
-  - Replace deprecated `on('get', callback)` handlers with `onGet`.
-- Replace the unmaintained `apcaccess` dependency with a small built-in apcupsd NIS client: a new connection per poll, with a 5s timeout, so the plugin recovers by itself when apcupsd restarts or the network drops.
-- Polling no longer overlaps (next poll is scheduled after the previous one finishes) and starts only after all services exist; it stops on Homebridge shutdown.
-- Temperature sensor value is now pushed to HomeKit on every poll and keeps decimals.
-- Add `config.schema.json` for the Homebridge UI: host and port side by side (port is a plain number field), temperature sensor explained (ITEMP is only reported by Smart-UPS models), polling/logging and accessory information grouped in collapsed sections. Empty fields fall back to the defaults.
-- Services are now named after what they show: `<name> Charge` (battery), `<name> Power` (mains power sensor) and `<name> Temperature`, e.g. "UPS Charge".
-- New `contactSensor` option (default `true`) to hide the mains power contact sensor, and `powerSensorType` (`contact`, `leak` or `smoke`) to publish it as a leak or smoke sensor so power cuts arrive as HomeKit critical alerts.
-- Load and temperature readings are only logged in debug mode (`-D`), since they change often and are already visible in HomeKit.
-- Line voltage is only logged with the new `logVoltage` option, and only when it changed at least `voltageLogThreshold` % (default 5) since the last logged value.
-- New optional `voltageSensor`: exposes the input line voltage (`LINEV`) as a light sensor (lux = volts).
-- New optional `loadSensor`: exposes the UPS load (`LOADPCT`) as a light sensor (lux = %), the same type as the voltage sensor.
-- Fix: with `errorLogsOnly` enabled, a low battery or an unreachable apcupsd threw `update.error is not a function`, which could stop Homebridge. Unexpected polling errors are now always caught and logged.
-- When apcupsd can't be reached (at startup, or after 3 failed polls in a row) the UPS shows as "No Response" in HomeKit instead of its last known values.
-- With several UPS configured, each one now keeps its own log de-duplication, so one UPS no longer hides another's log lines.
-- New optional `lowBatteryLevel` (%) and `lowBatteryMinutes` (runtime left while on battery) thresholds to report low battery before the UPS does.
-- Manufacturer now defaults to `APC` and is no longer asked for in the settings form (`manufacturer` in `config.json` is still honoured).
-- Fix: when apcupsd loses the UPS (`COMMLOST`, e.g. USB cable unplugged) the plugin reported a power cut, a false critical alert with the leak/smoke sensor types. It now shows the UPS as "No Response". "On battery" is read from apcupsd's on-battery flag.
-- Fix: apcupsd's "replace battery" flag was shown as "Not chargeable". It is now reported as low battery, with a warning in the log.
-- Fix: shutting down while a request to apcupsd was in flight kept the plugin polling after shutdown, so Homebridge had to force-exit after 5 s. The request is now cancelled on shutdown.
-- Polling interval is clamped to at least 1 second.
-- Model, serial number and firmware/software revision reported by the UPS now actually show up in HomeKit and the Homebridge UI (served through `onGet`, since Homebridge copies the required AccessoryInformation values only once at startup). The accessory name always comes from the `name` config option; the UPS name is only logged.
-- Tooling: ESLint 9 (flat config), Prettier 3, `node:test` unit tests; drop `prettier-eslint` and `eslint-config-airbnb-base`.
+## Compatibility
+
+- Homebridge 2.x support (tested with v2.4.0), while keeping Homebridge 1.8 or later working.
+  - Use `Service.Battery`: HAP-NodeJS 1.x/2.x removed `Service.BatteryService`, which caused `TypeError: Service.BatteryService is not a constructor`.
+  - Replace the deprecated `on('get', callback)` handlers with `onGet`.
+- Replace the unmaintained `apcaccess` dependency with a small built-in apcupsd client: a new connection per poll with a 5 s timeout, so the plugin recovers on its own when apcupsd restarts or the network drops. The plugin has no runtime dependencies.
+
+## New
+
+- `config.schema.json`, so the plugin can be configured from the Homebridge UI.
+- `powerSensorType` (`contact`, `leak` or `smoke`): publish the power sensor as a leak or smoke sensor, so power cuts arrive as HomeKit critical alerts.
+- `contactSensor` (default `true`): turn off the power sensor if you only want the battery status.
+- `loadSensor`: the UPS load (`LOADPCT`) as a light sensor (lux = %).
+- `voltageSensor`: the input line voltage (`LINEV`) as a light sensor (lux = volts).
+- `lowBatteryLevel` (%) and `lowBatteryMinutes` (runtime left while on battery): report low battery before the UPS does.
+- `logVoltage` and `voltageLogThreshold` (default 5 %): optionally log the line voltage, only when it changed at least that much since the last logged value.
+- The accessory shows as "No Response" in HomeKit, instead of its last known values, when apcupsd can't be reached (at startup, or for 3 polls in a row) or apcupsd lost contact with the UPS (`COMMLOST`).
+
+## Changed
+
+- Sensors are named after what they show: `<name> Power`, `<name> Charge`, `<name> Temperature`, `<name> Load` and `<name> Voltage` (e.g. "UPS Charge").
+- The model, serial number, firmware and apcupsd version reported by the UPS now actually show up in HomeKit and the Homebridge UI. The accessory name always comes from the `name` option; the UPS name is only logged.
+- The manufacturer defaults to `APC` and is no longer asked for in the settings (`manufacturer` in `config.json` is still honoured).
+- "Replace battery" from the UPS is reported as low battery, with a warning in the log (it was shown as "Not chargeable").
+- Load and temperature readings are only logged in debug mode (`-D`); the line voltage only with `logVoltage`.
+- Temperature keeps its decimals and is pushed to HomeKit on every poll.
+- Polls never overlap, start once all sensors exist, and the interval is at least 1 second.
+
+## Fixed
+
+- With `errorLogsOnly` on, a low battery or an unreachable apcupsd threw `update.error is not a function`, which could stop Homebridge. Unexpected polling errors are now always caught and logged.
+- When apcupsd lost contact with the UPS (`COMMLOST`, e.g. USB cable unplugged) the plugin reported a power cut, a false critical alert with the leak or smoke sensor types. "On battery" is now read from apcupsd's on-battery flag.
+- Shutting down while a request to apcupsd was in flight kept the plugin polling after shutdown, and Homebridge had to force-exit after 5 s. The request is now cancelled on shutdown.
+- With several UPS configured, one UPS could hide another's log lines.
+
+## Internal
+
+- ESLint 9 (flat config), Prettier 3 and `node:test` unit tests, including tests against Homebridge 2's HAP-NodeJS; `prettier-eslint` and `eslint-config-airbnb-base` dropped.
+- GitHub Actions CI on Node 22 and 24.
 
 # [1.0.3]
 
