@@ -1,60 +1,84 @@
 # homebridge-apcaccess
 
-An [apcaccess](https://github.com/mapero/apcaccess) wrapper for [Homebridge](https://github.com/homebridge/homebridge). Supports precisely one UPS. If you're on battery power, the Contact Sensor is open.
+A [Homebridge](https://github.com/homebridge/homebridge) plugin that exposes an APC UPS managed by [apcupsd](http://www.apcupsd.org/) to HomeKit: power cuts, battery charge and, optionally, temperature, load and line voltage. Works with Homebridge 1.8+ and 2.x (tested with v2.4.0).
 
-<img src="https://user-images.githubusercontent.com/1850718/75247783-a0bd6b00-57ca-11ea-9391-0db0afdaf2cf.PNG" width="250" align="right"/>
+Several UPS are supported: add one accessory per apcupsd instance.
 
-This accessory:
+## What shows up in HomeKit
 
-- Is essentially a worse version of [homespun/homebridge-accessory-apcupsd](https://github.com/homespun/homebridge-accessory-apcupsd) which I was too dumb to get working.
-- Publishes a `Battery` service named `<name> Charge` to show charging state / battery levels.
-- Publishes a `ContactSensor` named `<name> Power` with two subscribable events: `Contact State` and `Low Battery`, for your push alerting pleasure. Can be turned off with `"contactSensor": false`, or published as a leak (`"powerSensorType": "leak"`) or smoke (`"smoke"`) sensor instead: HomeKit sends those as critical alerts, which get through Do Not Disturb / Focus (the Home app will word them as a leak or smoke alarm).
-- Optionally publishes a `TemperatureSensor` named `<name> Temperature` with the UPS internal temperature (apcupsd's `ITEMP`). Only Smart-UPS models report it; Back-UPS models don't.
-- Optionally publishes the UPS load (apcupsd's `LOADPCT`, % of rated power in use) as a `HumiditySensor` named `<name> Load`, since HomeKit has no load sensor type.
-- Optionally publishes the input line voltage (apcupsd's `LINEV`) as a `LightSensor` named `<name> Voltage` (222 lux = 222 V), since HomeKit has no voltage sensor type.
+Each service is named after the accessory `name` (`UPS` in these examples):
+
+| Service             | HomeKit type                            | Shows                                         | Option                             |
+| ------------------- | --------------------------------------- | --------------------------------------------- | ---------------------------------- |
+| **UPS Power**       | Contact sensor (or leak / smoke sensor) | Open / leak / smoke while running on battery  | `contactSensor`, `powerSensorType` |
+| **UPS Charge**      | Battery                                 | Charge %, charging state, low battery         | always                             |
+| **UPS Temperature** | Temperature sensor                      | UPS internal temperature (`ITEMP`)            | `temperatureSensor`                |
+| **UPS Load**        | Humidity sensor                         | Load, % of rated power in use (`LOADPCT`)     | `loadSensor`                       |
+| **UPS Voltage**     | Light sensor                            | Input line voltage (`LINEV`), 222 lux = 222 V | `voltageSensor`                    |
+
+- **Power cut alerts:** the power sensor is a contact sensor by default. Set `powerSensorType` to `leak` or `smoke` to get HomeKit **critical alerts**, which get through Do Not Disturb and Focus. The Home app will word them as a leak or smoke alarm.
+- **Low battery** is reported when the UPS flags it, when it asks for a new battery, or below the optional `lowBatteryLevel` / `lowBatteryMinutes` thresholds.
+- **Load and voltage** use humidity and light sensors because HomeKit has no load or voltage sensor types.
+- **Temperature** is only reported by Smart-UPS models. Back-UPS and most consumer models don't have it.
+- **No Response:** if apcupsd can't be reached, or it loses contact with the UPS (`COMMLOST`), the accessory shows as "No Response" instead of stale values.
+- **Accessory information:** model, serial number, firmware and apcupsd version are read from the UPS.
 
 ## Requirements
 
-- Homebridge `^1.8.0` or `^2.0.0` (tested with v2.4.0)
+- Homebridge `^1.8.0` or `^2.0.0`
 - Node.js 20, 22, 24 or 26 (Homebridge 2.x itself requires Node.js 22+)
-- [apcupsd](http://www.apcupsd.org/) with its Network Information Server enabled (`NETSERVER on` in `apcupsd.conf`)
+- apcupsd with its Network Information Server enabled (`NETSERVER on` in `/etc/apcupsd/apcupsd.conf`, port 3551 by default)
 
-The plugin has no runtime dependencies: it talks to apcupsd's NIS protocol directly.
+The plugin has no runtime dependencies: it talks to apcupsd's NIS protocol directly, opening a new connection on every poll, so it recovers on its own when apcupsd restarts.
 
 ## Configuration
 
-The plugin will run with these default values, they can be changed in the `accessories: []` section of homebridge config:
+Configure it from the Homebridge UI, or add an accessory to `config.json`. Every option except `accessory` and `name` is optional; these are the defaults:
 
 ```json
 {
-    "name": "APC UPS",
-    "host": "127.0.0.1",
-    "port": 3551,
-    "model": "APCAccess UPS",
-    "serial": "unknown",
-    "interval": 1,
-    "contactSensor": true,
-    "powerSensorType": "contact",
-    "temperatureSensor": false,
-    "loadSensor": false,
-    "voltageSensor": false,
-    "lowBatteryLevel": 0,
-    "lowBatteryMinutes": 0,
-    "errorLogsOnly": false
+  "accessories": [
+    {
+      "accessory": "APCAccess",
+      "name": "APC UPS",
+      "host": "localhost",
+      "port": 3551,
+      "contactSensor": true,
+      "powerSensorType": "contact",
+      "temperatureSensor": false,
+      "loadSensor": false,
+      "voltageSensor": false,
+      "lowBatteryLevel": 0,
+      "lowBatteryMinutes": 0,
+      "interval": 1,
+      "errorLogsOnly": false
+    }
+  ]
 }
 ```
 
-`interval` is in seconds (minimum 1).
-
-Low battery is reported when the UPS itself flags it. `lowBatteryLevel` (%) and `lowBatteryMinutes` (estimated runtime left, only checked while on battery) can trigger it earlier; `0` disables them.
-
-Once connected, the model, serial number, firmware and apcupsd version reported by the UPS replace the `model`, `serial`, `firmwareRevision` and `softwareRevision` values; those options are only used as a fallback when the UPS doesn't report them. The accessory name always comes from `name`. The manufacturer is always shown as `APC` (apcupsd doesn't report it); a `manufacturer` option left over from older configs still overrides it.
-
-The plugin also ships a `config.schema.json`, so it can be configured from the Homebridge UI.
+| Option                                             | Description                                                                                               |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `name`                                             | Accessory name, also used as prefix for the service names.                                                |
+| `host`, `port`                                     | Where apcupsd's NIS listens.                                                                              |
+| `contactSensor`                                    | Expose the power sensor. Turn off if you only want the battery status.                                    |
+| `powerSensorType`                                  | `contact`, `leak` or `smoke` (see above).                                                                 |
+| `temperatureSensor`, `loadSensor`, `voltageSensor` | Expose the optional sensors.                                                                              |
+| `lowBatteryLevel`                                  | Also report low battery at or below this charge %. `0` disables it.                                       |
+| `lowBatteryMinutes`                                | While on battery, also report low battery at or below this many minutes of runtime left. `0` disables it. |
+| `interval`                                         | Polling interval in seconds (minimum 1).                                                                  |
+| `errorLogsOnly`                                    | Only log errors and warnings.                                                                             |
+| `model`, `serial`, `firmwareRevision`              | Only used if the UPS doesn't report them.                                                                 |
 
 ## Development
 
 ```sh
 npm install
-npm test   # eslint + prettier check + unit tests (includes a test against Homebridge 2's HAP-NodeJS)
+npm test   # eslint + prettier check + unit tests, including tests against Homebridge 2's HAP-NodeJS
 ```
+
+CI runs the same on Node 22 and 24.
+
+## Credits
+
+Originally written by [Paul Curry (cr3ative)](https://github.com/cr3ative/homebridge-apcaccess), with contributions from [davidjbradshaw](https://github.com/davidjbradshaw) and [ThisIsQasim](https://github.com/ThisIsQasim). See the [CHANGELOG](CHANGELOG.md).
