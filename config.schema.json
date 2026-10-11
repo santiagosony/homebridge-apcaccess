@@ -25,10 +25,39 @@
         "description": "Leave empty to use apcupsd's default NIS port (3551)."
       },
       "contactSensor": {
-        "title": "Expose a contact sensor for mains power",
+        "title": "Expose a mains power sensor",
         "type": "boolean",
         "default": true,
-        "description": "Open when the UPS is running on battery, closed when mains power is connected. Turn off if you only want the battery status."
+        "description": "Triggered when the UPS is running on battery, idle while mains power is connected. Turn off if you only want the battery status."
+      },
+      "powerSensorType": {
+        "title": "Mains power sensor type",
+        "type": "string",
+        "default": "contact",
+        "oneOf": [
+          {
+            "title": "Contact sensor (open on power cut)",
+            "enum": [
+              "contact"
+            ]
+          },
+          {
+            "title": "Leak sensor (critical alert on power cut)",
+            "enum": [
+              "leak"
+            ]
+          },
+          {
+            "title": "Smoke sensor (critical alert on power cut)",
+            "enum": [
+              "smoke"
+            ]
+          }
+        ],
+        "condition": {
+          "functionBody": "return model.contactSensor !== false;"
+        },
+        "description": "HomeKit sends leak and smoke alerts as critical notifications that show up even in Do Not Disturb or Focus. Note that the Home app will also label the power cut as a leak or smoke alarm."
       },
       "temperatureSensor": {
         "title": "Expose a temperature sensor",
@@ -97,6 +126,7 @@
       ]
     },
     "contactSensor",
+    "powerSensorType",
     "temperatureSensor",
     "loadSensor",
     {

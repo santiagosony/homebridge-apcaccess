@@ -8,7 +8,7 @@ This accessory:
 
 - Is essentially a worse version of [homespun/homebridge-accessory-apcupsd](https://github.com/homespun/homebridge-accessory-apcupsd) which I was too dumb to get working.
 - Publishes a `Battery` service named `<name> Charge` to show charging state / battery levels.
-- Publishes `ContactSensor` two subscribable events: `Contact State` and `Low Battery`, for your push alerting pleasure. Can be turned off with `"contactSensor": false`.
+- Publishes `ContactSensor` two subscribable events: `Contact State` and `Low Battery`, for your push alerting pleasure. Can be turned off with `"contactSensor": false`, or published as a leak (`"powerSensorType": "leak"`) or smoke (`"smoke"`) sensor instead: HomeKit sends those as critical alerts, which get through Do Not Disturb / Focus (the Home app will word them as a leak or smoke alarm).
 - Optionally publishes a `TemperatureSensor` with the UPS internal temperature (apcupsd's `ITEMP`). Only Smart-UPS models report it; Back-UPS models don't.
 - Optionally publishes the UPS load (apcupsd's `LOADPCT`, % of rated power in use) as a `HumiditySensor` named `<name> Load`, since HomeKit has no load sensor type.
 
@@ -34,6 +34,7 @@ The plugin will run with these default values, they can be changed in the `acces
     "serial": "unknown",
     "interval": 1,
     "contactSensor": true,
+    "powerSensorType": "contact",
     "temperatureSensor": false,
     "loadSensor": false,
     "errorLogsOnly": false

@@ -23,6 +23,29 @@ const DEVICE_INFO = {
   SoftwareRevision: { key: 'VERSION', config: 'softwareRevision', fallback: UNKNOWN },
 };
 
+// Sensor types that can report mains power; each is "triggered" while running on battery.
+// Leak and smoke alerts are critical notifications in HomeKit (they break through Do Not Disturb).
+const POWER_SENSORS = {
+  contact: {
+    service: 'ContactSensor',
+    characteristic: 'ContactSensorState',
+    onBattery: 'CONTACT_NOT_DETECTED',
+    onMains: 'CONTACT_DETECTED',
+  },
+  leak: {
+    service: 'LeakSensor',
+    characteristic: 'LeakDetected',
+    onBattery: 'LEAK_DETECTED',
+    onMains: 'LEAK_NOT_DETECTED',
+  },
+  smoke: {
+    service: 'SmokeSensor',
+    characteristic: 'SmokeDetected',
+    onBattery: 'SMOKE_DETECTED',
+    onMains: 'SMOKE_NOT_DETECTED',
+  },
+};
+
 const UPS_ACTIVE = 0x08;
 const UPS_BATT_LOW = 0x40;
 const UPS_NOT_CHARGEABLE = 0x80;
@@ -41,7 +64,7 @@ class APCAccess {
     this.pollTimer = undefined;
 
     this.state = Object.seal({
-      contact: undefined,
+      onBattery: undefined,
       batteryLevel: undefined,
       lowBattery: undefined,
       chargingState: undefined,
@@ -70,10 +93,11 @@ class APCAccess {
 
     // Enabled unless explicitly turned off, to keep the behaviour of older versions
     if (this.config.contactSensor !== false) {
-      this.contactSensor = new Service.ContactSensor(name);
-      this.contactSensor
-        .getCharacteristic(Characteristic.ContactSensorState)
-        .onGet(() => Characteristic.ContactSensorState[this.parseContactValue()]);
+      this.powerSensor = POWER_SENSORS[this.config.powerSensorType] || POWER_SENSORS.contact;
+      this.powerService = new Service[this.powerSensor.service](name);
+      this.powerService
+        .getCharacteristic(Characteristic[this.powerSensor.characteristic])
+        .onGet(() => this.getPowerSensorValue());
     }
 
     // HAP-NodeJS >= 1.0 (Homebridge 2.x) renamed BatteryService to Battery
@@ -127,7 +151,7 @@ class APCAccess {
 
   getServices() {
     // Required by Homebridge; expose services this accessory claims to have
-    const services = [this.informationService, this.contactSensor, this.batteryService].filter(
+    const services = [this.informationService, this.powerService, this.batteryService].filter(
       Boolean,
     );
 
@@ -228,8 +252,7 @@ class APCAccess {
 
   parseTimeLeft = () => this.parseNumber('TIMELEFT');
 
-  parseContactValue = () =>
-    this.parseStatFlag() & UPS_ACTIVE ? 'CONTACT_DETECTED' : 'CONTACT_NOT_DETECTED';
+  isOnBattery = () => !(this.parseStatFlag() & UPS_ACTIVE);
 
   parseLowBatteryValue = () =>
     this.parseStatFlag() & UPS_BATT_LOW ? 'BATTERY_LEVEL_LOW' : 'BATTERY_LEVEL_NORMAL';
@@ -241,15 +264,24 @@ class APCAccess {
         ? 'NOT_CHARGING'
         : 'CHARGING';
 
+  // Value of the mains power sensor: "triggered" (open / leak / smoke) while on battery
+  getPowerSensorValue() {
+    const { characteristic, onBattery, onMains } = this.powerSensor;
+    return Characteristic[characteristic][this.isOnBattery() ? onBattery : onMains];
+  }
+
   checkContact() {
-    const contactBool = Characteristic.ContactSensorState[this.parseContactValue()];
+    const onBattery = this.isOnBattery();
 
-    this.log.update.info('Power:', contactBool ? 'Disconnected' : 'Connected');
+    this.log.update.info('Power:', onBattery ? 'Disconnected' : 'Connected');
 
-    if (this.contactSensor && this.state.contact !== contactBool) {
-      this.log.debug('Pushing contact state change; ', contactBool, this.state.contact);
-      this.contactSensor.updateCharacteristic(Characteristic.ContactSensorState, contactBool);
-      this.state.contact = contactBool;
+    if (this.powerService && this.state.onBattery !== onBattery) {
+      this.log.debug('Pushing power state change; ', onBattery, this.state.onBattery);
+      this.powerService.updateCharacteristic(
+        Characteristic[this.powerSensor.characteristic],
+        this.getPowerSensorValue(),
+      );
+      this.state.onBattery = onBattery;
     }
   }
 

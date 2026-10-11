@@ -25,9 +25,14 @@ const silentLog = () => {
   return log;
 };
 
-const createAccessory = async (t, config) => {
+// Running on battery: UPS_ONBATT (0x10) set, UPS_ONLINE (0x08) cleared
+const ON_BATTERY = STATUS.map((line) =>
+  line.startsWith('STATFLAG') ? 'STATFLAG : 0x05000050' : line,
+);
+
+const createAccessory = async (t, { status = STATUS, ...config }) => {
   const { HAPLibraryVersion, ...hap } = await import('@homebridge/hap-nodejs');
-  const server = await startFakeApcupsd(STATUS);
+  const server = await startFakeApcupsd(status);
 
   const api = new EventEmitter();
   api.hap = hap;
@@ -89,7 +94,7 @@ test('works against the HAP-NodeJS shipped with Homebridge 2', async (t) => {
     Characteristic.ChargingState.CHARGING,
   );
   assert.equal(
-    value(accessory.contactSensor, Characteristic.ContactSensorState),
+    value(accessory.powerService, Characteristic.ContactSensorState),
     Characteristic.ContactSensorState.CONTACT_DETECTED,
   );
   assert.ok(
@@ -128,3 +133,24 @@ test('the contact sensor can be turned off', async (t) => {
   assert.ok(!services.some((service) => service instanceof Service.ContactSensor));
   assert.equal(accessory.batteryService.getCharacteristic(Characteristic.BatteryLevel).value, 42);
 });
+
+for (const [type, service, characteristic, value] of [
+  ['leak', 'LeakSensor', 'LeakDetected', 'LEAK_DETECTED'],
+  ['smoke', 'SmokeSensor', 'SmokeDetected', 'SMOKE_DETECTED'],
+]) {
+  test(`the power sensor can be a ${type} sensor`, async (t) => {
+    const { accessory, hap } = await createAccessory(t, {
+      powerSensorType: type,
+      status: ON_BATTERY,
+    });
+    const { Characteristic, Service } = hap;
+    await waitForFirstPoll(accessory);
+
+    assert.ok(accessory.powerService instanceof Service[service]);
+    assert.ok(!accessory.getServices().some((s) => s instanceof Service.ContactSensor));
+    assert.equal(
+      accessory.powerService.getCharacteristic(Characteristic[characteristic]).value,
+      Characteristic[characteristic][value],
+    );
+  });
+}
